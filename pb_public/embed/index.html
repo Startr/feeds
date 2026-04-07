@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Embed Widgets — Startr/feeds</title>
+<style>
+  :root { --bg: #fafafa; --fg: #1a1a1a; --muted: #666; --accent: #2563eb; --border: #e5e7eb; --card: #fff; --code-bg: #f3f4f6; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #111; --fg: #e5e5e5; --muted: #999; --accent: #60a5fa; --border: #333; --card: #1a1a1a; --code-bg: #222; } }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--fg); line-height: 1.6; padding: 2rem 1rem; max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }
+  h2 { font-size: 1.2rem; margin-top: 2rem; margin-bottom: 0.75rem; color: var(--accent); }
+  p { margin-bottom: 0.75rem; }
+  a { color: var(--accent); }
+  .subtitle { color: var(--muted); margin-bottom: 2rem; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; margin: 1rem 0; }
+  label { display: block; font-size: 0.9rem; font-weight: 600; margin-bottom: 0.25rem; }
+  input, select { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; font-family: inherit; background: var(--bg); color: var(--fg); margin-bottom: 0.75rem; }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .feed-picker { position: relative; }
+  .feed-picker-search { display: none; margin-bottom: 0.75rem; }
+  .feed-picker-search.active { display: block; }
+  .feed-list { list-style: none; margin: 0 0 0.75rem; }
+  .feed-list li { padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+  .feed-list li:hover { border-color: var(--accent); background: var(--code-bg); }
+  .feed-list li.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .feed-list .feed-title { font-weight: 600; }
+  .feed-list .feed-slug { font-size: 0.8rem; color: var(--muted); font-family: monospace; }
+  .feed-manual { font-size: 0.85rem; color: var(--muted); cursor: pointer; margin-bottom: 0.75rem; }
+  .feed-manual:hover { color: var(--accent); }
+  .manual-input { display: none; }
+  .manual-input.active { display: block; }
+  .snippet { position: relative; }
+  pre { background: var(--code-bg); border-radius: 6px; padding: 1rem; font-size: 0.85rem; overflow-x: auto; white-space: pre-wrap; word-break: break-all; color: var(--fg); }
+  .copy-btn { position: absolute; top: 8px; right: 8px; background: var(--accent); color: #fff; border: none; border-radius: 4px; padding: 4px 10px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .copy-btn:hover { opacity: 0.85; }
+  .section-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.5rem; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+  footer { color: var(--muted); font-size: 0.85rem; margin-top: 2rem; }
+  .preview-area { margin-top: 1rem; padding: 1rem; background: var(--code-bg); border-radius: 8px; }
+  .no-feeds { padding: 1rem; color: var(--muted); font-style: italic; }
+</style>
+</head>
+<body>
+
+<h1>Embed Widgets</h1>
+<p class="subtitle">Pick a feed, copy the embed code, paste it on your site.</p>
+
+<div class="card">
+  <div class="section-label">Select a feed</div>
+  <div id="feed-picker" class="feed-picker">
+    <p class="no-feeds" id="loading-msg">Loading feeds...</p>
+  </div>
+  <div id="manual-toggle" class="feed-manual" style="display:none">or enter a feed URL manually</div>
+  <div id="manual-section" class="manual-input">
+    <label for="feed-url">Feed URL</label>
+    <input type="url" id="feed-url" placeholder="https://feed.example.com/v1/your-show.xml">
+  </div>
+
+  <div class="section-label" style="margin-top:1rem">Subscribe links (optional)</div>
+  <label for="apple-url">Apple Podcasts URL</label>
+  <input type="url" id="apple-url" placeholder="https://podcasts.apple.com/podcast/id123456">
+  <label for="spotify-url">Spotify URL</label>
+  <input type="url" id="spotify-url" placeholder="https://open.spotify.com/show/abc123">
+</div>
+
+<h2>Player Widget</h2>
+<p>Drop this on any page. The player fetches your RSS feed, shows episode artwork, and lets visitors play episodes.</p>
+<div class="snippet">
+  <button class="copy-btn" onclick="copySnippet('player-code')">Copy</button>
+  <pre id="player-code"></pre>
+</div>
+
+<h2>Subscribe Widget</h2>
+<p>Shows "Listen on" badges for each platform you configure. Only platforms with URLs will render.</p>
+<div class="snippet">
+  <button class="copy-btn" onclick="copySnippet('subscribe-code')">Copy</button>
+  <pre id="subscribe-code"></pre>
+</div>
+
+<h2>Live Preview</h2>
+<div class="preview-area" id="preview"></div>
+
+<hr>
+<footer>
+  <a href="/">Home</a> &middot; <a href="/_/">Admin Dashboard</a> &middot;
+  <a href="https://github.com/Startr/feeds">GitHub</a> &middot; AGPL-3.0
+</footer>
+
+<script src="/widgets/player.js"></script>
+<script src="/widgets/subscribe.js"></script>
+<script>
+(function() {
+  var picker = document.getElementById('feed-picker');
+  var manualToggle = document.getElementById('manual-toggle');
+  var manualSection = document.getElementById('manual-section');
+  var feedInput = document.getElementById('feed-url');
+  var appleInput = document.getElementById('apple-url');
+  var spotifyInput = document.getElementById('spotify-url');
+  var playerCode = document.getElementById('player-code');
+  var subscribeCode = document.getElementById('subscribe-code');
+  var preview = document.getElementById('preview');
+  var loadingMsg = document.getElementById('loading-msg');
+
+  var feeds = [];
+  var selectedSlug = '';
+
+  function base() { return location.origin; }
+
+  function esc(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function feedUrl() {
+    if (selectedSlug) return base() + '/v1/' + selectedSlug + '.xml';
+    var manual = feedInput.value.trim();
+    return manual || '';
+  }
+
+  function renderPicker() {
+    if (feeds.length === 0) {
+      picker.innerHTML = '<p class="no-feeds">No feeds configured yet. <a href="/_/">Add one in the admin dashboard</a>, or enter a URL below.</p>';
+      manualToggle.style.display = 'none';
+      manualSection.classList.add('active');
+      return;
+    }
+
+    // Single feed: just show it selected, no search
+    // Multiple feeds: add a search filter
+    var html = '';
+    if (feeds.length > 1) {
+      html += '<input type="text" id="feed-search" class="feed-picker-search active" placeholder="Search feeds...">';
+    }
+    html += '<ul class="feed-list" id="feed-list">';
+    for (var i = 0; i < feeds.length; i++) {
+      var f = feeds[i];
+      html += '<li data-slug="' + esc(f.slug) + '"' + (i === 0 ? ' class="selected"' : '') + '>';
+      html += '<span class="feed-title">' + esc(f.title || f.slug) + '</span>';
+      html += '<span class="feed-slug">/v1/' + esc(f.slug) + '.xml</span>';
+      html += '</li>';
+    }
+    html += '</ul>';
+    picker.innerHTML = html;
+
+    // Select first feed
+    selectedSlug = feeds[0].slug;
+
+    // Click to select
+    var list = document.getElementById('feed-list');
+    list.addEventListener('click', function(ev) {
+      var li = ev.target.closest('li');
+      if (!li) return;
+      var items = list.querySelectorAll('li');
+      for (var j = 0; j < items.length; j++) items[j].classList.remove('selected');
+      li.classList.add('selected');
+      selectedSlug = li.getAttribute('data-slug');
+      update();
+    });
+
+    // Search filter
+    var search = document.getElementById('feed-search');
+    if (search) {
+      search.addEventListener('input', function() {
+        var q = search.value.toLowerCase();
+        var items = list.querySelectorAll('li');
+        for (var j = 0; j < items.length; j++) {
+          var slug = items[j].getAttribute('data-slug').toLowerCase();
+          var title = (items[j].querySelector('.feed-title').textContent || '').toLowerCase();
+          items[j].style.display = (slug.indexOf(q) !== -1 || title.indexOf(q) !== -1) ? '' : 'none';
+        }
+      });
+    }
+
+    // Show manual toggle
+    manualToggle.style.display = '';
+    manualToggle.addEventListener('click', function() {
+      selectedSlug = '';
+      var items = list.querySelectorAll('li');
+      for (var j = 0; j < items.length; j++) items[j].classList.remove('selected');
+      manualSection.classList.toggle('active');
+      update();
+    });
+  }
+
+  function update() {
+    var feed = feedUrl();
+    var apple = appleInput.value.trim();
+    var spotify = spotifyInput.value.trim();
+    var feedDisplay = feed || base() + '/v1/your-show.xml';
+
+    // Player snippet
+    playerCode.textContent =
+      '<script src="' + base() + '/widgets/player.js"><\/script>\n' +
+      '<startr-player feed="' + esc(feedDisplay) + '"><\/startr-player>';
+
+    // Subscribe snippet
+    var subAttrs = '';
+    if (apple) subAttrs += '\n  apple="' + esc(apple) + '"';
+    if (spotify) subAttrs += '\n  spotify="' + esc(spotify) + '"';
+    subAttrs += '\n  rss="' + esc(feedDisplay) + '"';
+
+    subscribeCode.textContent =
+      '<script src="' + base() + '/widgets/subscribe.js"><\/script>\n' +
+      '<startr-subscribe' + subAttrs + '>\n<\/startr-subscribe>';
+
+    // Live preview
+    preview.innerHTML = '';
+    if (feed) {
+      var player = document.createElement('startr-player');
+      player.setAttribute('feed', feed);
+      preview.appendChild(player);
+    }
+    var sub = document.createElement('startr-subscribe');
+    if (apple) sub.setAttribute('apple', apple);
+    if (spotify) sub.setAttribute('spotify', spotify);
+    sub.setAttribute('rss', feedDisplay);
+    if (apple || spotify || feed) {
+      preview.appendChild(sub);
+    }
+  }
+
+  feedInput.addEventListener('input', function() {
+    selectedSlug = '';
+    var items = document.querySelectorAll('.feed-list li');
+    for (var j = 0; j < items.length; j++) items[j].classList.remove('selected');
+    update();
+  });
+  appleInput.addEventListener('input', update);
+  spotifyInput.addEventListener('input', update);
+
+  // Load feeds from public API
+  fetch('/api/feeds/public')
+    .then(function(r) { return r.ok ? r.json() : Promise.reject(); })
+    .then(function(data) {
+      feeds = (data.feeds || []);
+      renderPicker();
+      update();
+    })
+    .catch(function() {
+      feeds = [];
+      renderPicker();
+      update();
+    });
+})();
+
+function copySnippet(id) {
+  var pre = document.getElementById(id);
+  navigator.clipboard.writeText(pre.textContent).then(function() {
+    var btn = pre.parentNode.querySelector('.copy-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
+  });
+}
+</script>
+</body>
+</html>

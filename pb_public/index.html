@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Startr/feeds</title>
+<link rel="alternate" type="application/rss+xml" title="Startr/feeds" href="/v1/">
+<style>
+  :root { --bg: #fafafa; --fg: #1a1a1a; --muted: #666; --accent: #2563eb; --border: #e5e7eb; --card: #fff; --code-bg: #f3f4f6; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #111; --fg: #e5e5e5; --muted: #999; --accent: #60a5fa; --border: #333; --card: #1a1a1a; --code-bg: #222; } }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--fg); line-height: 1.6; padding: 2rem 1rem; max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }
+  h2 { font-size: 1.2rem; margin-top: 2rem; margin-bottom: 0.75rem; color: var(--accent); }
+  h3 { font-size: 1rem; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+  p { margin-bottom: 0.75rem; }
+  a { color: var(--accent); }
+  .subtitle { color: var(--muted); margin-bottom: 2rem; }
+  .admin-link { display: inline-block; background: var(--accent); color: #fff; padding: 0.6rem 1.4rem; border-radius: 6px; text-decoration: none; font-weight: 600; margin: 1rem 0; }
+  .admin-link:hover { opacity: 0.9; }
+  table { width: 100%; border-collapse: collapse; margin: 0.75rem 0 1.5rem; }
+  th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+  th { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
+  td:first-child { font-weight: 600; white-space: nowrap; width: 30%; }
+  .example { color: var(--muted); font-size: 0.9rem; }
+  code { background: var(--code-bg); padding: 0.15em 0.4em; border-radius: 3px; font-size: 0.9em; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; margin: 1rem 0; }
+  .section-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.5rem; }
+  .derived { background: var(--code-bg); border-radius: 6px; padding: 0.75rem 1rem; margin: 0.5rem 0 1rem; font-size: 0.9rem; }
+  .derived strong { color: var(--accent); }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+  footer { color: var(--muted); font-size: 0.85rem; margin-top: 2rem; }
+</style>
+</head>
+<body>
+
+<h1>Startr/feeds</h1>
+<p class="subtitle">Self-hosted feed rewriter &mdash; own your subscriber URL, rent the audio host.</p>
+
+<a class="admin-link" href="/_/">Open Admin Dashboard</a>
+
+<div id="demo"></div>
+
+<h2>Adding a Feed</h2>
+
+<p>In the admin dashboard, open the <strong>feeds</strong> collection and click <strong>New Record</strong>. Here's what each field means:</p>
+
+<div class="card">
+  <div class="section-label">What to rewrite</div>
+  <table>
+    <tr>
+      <td>source_url</td>
+      <td>
+        The RSS feed URL you want to rewrite. This is the original feed from your audio host.<br>
+        <span class="example">e.g. <code>https://anchor.fm/s/9822e708/podcast/rss</code></span>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<div class="card">
+  <div class="section-label">Where to publish</div>
+  <table>
+    <tr>
+      <td>slug</td>
+      <td>
+        A short identifier for your feed &mdash; letters, numbers, and hyphens. This single value determines both where the file is saved and its public URL.<br>
+        <span class="example">e.g. <code>my-show</code></span>
+      </td>
+    </tr>
+  </table>
+  <div class="derived">
+    A slug of <code>my-show</code> produces:<br>
+    <strong>File:</strong> <code>pb_public/v1/my-show.xml</code><br>
+    <strong>URL:</strong> <code>https://yourdomain.com/v1/my-show.xml</code>
+  </div>
+  <table>
+    <tr>
+      <td>domain</td>
+      <td>
+        Optional. Override the domain used in the feed's public URL. Leave blank to use the default (set via <code>FEEDS_DOMAIN</code> env var or the PocketBase Application URL in admin settings).<br>
+        <span class="example">e.g. <code>https://feed.example.com</code></span>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<div class="card">
+  <div class="section-label">Your branding</div>
+  <table>
+    <tr>
+      <td>title</td>
+      <td>
+        Your show's name &mdash; replaces whatever the upstream feed says.<br>
+        <span class="example">e.g. <code>The Startr Podcast</code></span>
+      </td>
+    </tr>
+    <tr>
+      <td>website</td>
+      <td>
+        Your show's homepage URL.<br>
+        <span class="example">e.g. <code>https://yourdomain.com/podcast</code></span>
+      </td>
+    </tr>
+    <tr>
+      <td>cover_image</td>
+      <td>
+        URL to your cover art. Optional &mdash; leave blank to keep the upstream image.<br>
+        <span class="example">e.g. <code>https://yourdomain.com/podcast/cover.jpg</code></span>
+      </td>
+    </tr>
+    <tr>
+      <td>author</td>
+      <td>
+        The show author for Apple Podcasts / iTunes. Optional.<br>
+        <span class="example">e.g. <code>Jane Doe</code></span>
+      </td>
+    </tr>
+    <tr>
+      <td>owner_email</td>
+      <td>
+        Contact email for Apple Podcasts. Optional.<br>
+        <span class="example">e.g. <code>podcasts@yourdomain.com</code></span>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<div class="card">
+  <div class="section-label">Schedule (optional)</div>
+  <table>
+    <tr>
+      <td>schedule</td>
+      <td>
+        How often to check for upstream changes, as a cron expression. Leave blank for the default (every 15 minutes).<br>
+        <span class="example">
+          <code>*/15 * * * *</code> &mdash; every 15 min (default)<br>
+          <code>*/5 * * * *</code> &mdash; every 5 min<br>
+          <code>0 * * * *</code> &mdash; every hour<br>
+          <code>0 */6 * * *</code> &mdash; every 6 hours
+        </span>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<p>That's it &mdash; save the record and the feed will be rewritten on the next cron tick. The first rewrite also runs automatically when the server starts.</p>
+
+<hr>
+
+<h2>Environment Variables (alternative)</h2>
+
+<p>For single-feed deploys, you can skip the admin UI and configure via environment variables instead. The server uses these as a fallback when no records exist in the feeds collection.</p>
+
+<div class="card">
+  <table>
+    <tr><th>Variable</th><th>Description</th></tr>
+    <tr><td>FEEDS_SOURCE_URL</td><td>RSS feed URL to rewrite (required)</td></tr>
+    <tr><td>FEEDS_SLUG</td><td>Feed identifier &mdash; e.g. <code>my-show</code> (required)</td></tr>
+    <tr><td>FEEDS_DOMAIN</td><td>Your domain &mdash; e.g. <code>https://feed.example.com</code></td></tr>
+    <tr><td>FEEDS_TITLE</td><td>Show title (required)</td></tr>
+    <tr><td>FEEDS_WEBSITE</td><td>Show homepage URL (required)</td></tr>
+    <tr><td>FEEDS_COVER_IMAGE</td><td>Cover art URL</td></tr>
+    <tr><td>FEEDS_ITUNES_AUTHOR</td><td>iTunes author</td></tr>
+    <tr><td>FEEDS_ITUNES_OWNER_EMAIL</td><td>iTunes owner email</td></tr>
+    <tr><td>FEEDS_CRON</td><td>Cron schedule (default: <code>*/15 * * * *</code>)</td></tr>
+  </table>
+</div>
+
+<hr>
+
+<footer>
+  <p><a href="https://github.com/Startr/feeds">Startr/feeds</a> &mdash; AGPL-3.0</p>
+</footer>
+
+<script src="/widgets/player.js"></script>
+<script src="/widgets/subscribe.js"></script>
+<script>
+(function() {
+  var demo = document.getElementById('demo');
+
+  // Discover feeds via public endpoint (no auth required)
+  fetch('/api/feeds/public')
+    .then(function(r) { return r.ok ? r.json() : Promise.reject(); })
+    .then(function(data) {
+      if (data.feeds && data.feeds.length > 0) {
+        renderDemo(data.feeds[0].slug);
+      } else {
+        renderPlaceholder();
+      }
+    })
+    .catch(function() {
+      renderPlaceholder();
+    });
+
+  function renderDemo(slug) {
+    var feedUrl = location.origin + '/v1/' + slug + '.xml';
+    demo.innerHTML =
+      '<h2>Your Feed</h2>' +
+      '<startr-player feed="' + feedUrl + '"></startr-player>' +
+      '<div style="margin-top:12px">' +
+      '<startr-subscribe rss="' + feedUrl + '"></startr-subscribe>' +
+      '</div>' +
+      '<p style="margin-top:12px"><a href="/embed">Get embed code</a> to put these widgets on your site.</p>';
+  }
+
+  function renderPlaceholder() {
+    demo.innerHTML =
+      '<h2>Widgets</h2>' +
+      '<p>Add a feed to see these widgets live with your content. ' +
+      '<a href="/embed">Embed code generator</a> has copy-paste snippets for your site.</p>' +
+      '<startr-player></startr-player>' +
+      '<div style="margin-top:12px">' +
+      '<startr-subscribe apple="#" spotify="#" rss="#"></startr-subscribe>' +
+      '</div>';
+  }
+})();
+</script>
+</body>
+</html>

@@ -5,6 +5,6 @@
     "COPY pb_hooks/ /app/pb_hooks/",
     "COPY pb_migrations/ /app/pb_migrations/",
     "COPY pb_public/ /app/pb_public/",
-    "CMD [\"feeds\", \"serve\"]"
+    "CMD [\"feeds\", \"serve\", \"--http=0.0.0.0:8090\"]"
   ]
 }

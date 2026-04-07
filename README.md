@@ -4,7 +4,7 @@
 
 Self-hosted feed rewriter. Fetch an RSS/Atom feed from upstream, rewrite the branding and channel metadata to point at your own URL, republish through your own infrastructure. Your subscribers bind to your URL, forever.
 
-Shipped as a single-shot Go binary. No daemon. No built-in scheduler. No cloud dependencies. Runs from cron, systemd, GitHub Actions, fly.io, k8s CronJob, Docker Compose, or a manual terminal invocation. Pick whichever scheduler fits your environment.
+Built on [PocketBase](https://pocketbase.io) as a standalone binary with JS hooks. Ship a single container and get: HTTP-served rewritten feeds, admin dashboard at `/_/` for managing feed configs, automatic cron-scheduled rewrites, and multi-feed support from day one. No Go compiler needed — the container downloads a pre-built PocketBase binary and runs the rewrite pipeline as a JS hook.
 
 ## Why this exists
 
@@ -14,20 +14,20 @@ Startr/feeds is the feed proxy / rewriter we wished existed:
 
 - **Own the subscriber relationship.** Subscribers bind to `feed.yourdomain.com/v1/your-show.xml`, not a third-party URL. Migrate audio hosts without breaking a single subscriber.
 - **Rent the audio host.** `<enclosure url>` elements are left untouched. Spotify or Anchor host the audio bytes for free. If you want to move to Archive.org, S3, or your own static host later, swap it with a config change and nobody notices.
-- **No lock-in, anywhere.** AGPL-3.0. Single binary. Self-hostable on anything that runs a Go binary, including a Raspberry Pi. If you want to run this from cron on a box in your closet, nothing stops you.
+- **No lock-in, anywhere.** AGPL-3.0. Single container. Self-hostable on anything that runs Docker, including a Raspberry Pi. If you want to run this on a box in your closet, nothing stops you.
 
 ## Current scope (v0.0.x)
 
-- Two subcommands: `feeds rewrite` (single-shot for cron/CI) and `feeds serve` (long-running ticker for always-on hosts; fail-soft when no upstream is configured so empty starts don't crash deploys)
-- One source adapter: `SpotifySource` (parses Spotify for Podcasters' auto-generated RSS)
-- One output renderer: `RSS2PodcastRenderer` (writes RSS 2.0 + iTunes namespace XML)
-- DOM-style rewriter via [`beevik/etree`](https://github.com/beevik/etree) — preserves iTunes namespace, podcast 2.0 namespace, and any unknown Spotify tags on round-trip
+- **PocketBase standalone** — pre-built binary (renamed to `feeds` for branding). HTTP static file serving, admin UI at `/_/`, built-in cron scheduler, SQLite, graceful shutdown. One container does everything.
+- **JS hook rewrite pipeline** (`pb_hooks/feeds.pb.js`) — the entire rewrite logic runs inside PocketBase's goja runtime. Zero Go compilation, build time in seconds.
+- **Multi-feed from day one** — feed configs stored in PocketBase's "feeds" collection, managed via the admin UI at `/_/`. Single-feed deploys can use `FEEDS_*` env vars instead.
+- XML parsing via [xml-js](https://github.com/nicknisi/xml-js) (vendored UMD bundle) — non-compact mode preserves iTunes namespace, podcast 2.0 namespace, and any unknown tags on round-trip
 - `<channel><generator>` rewritten to identify Startr/feeds + version (replaces upstream "Anchor Podcasts" / "Spotify for Podcasters")
 - HTTP conditional GET with `If-None-Match` / `If-Modified-Since` (98% of scheduled runs short-circuit on HTTP 304)
-- Atomic write-rename output (readers never see a partial file)
-- Fail-loud on upstream errors — last-good output is preserved
+- Fail-loud per feed on upstream errors — last-good output is preserved, other feeds continue
+- **Go pipeline** (`internal/`) kept as reference implementation and high-performance fallback for large-scale multi-feed deployments
 
-v0.2 wraps this in [PocketBase](https://pocketbase.io) for multi-feed orchestration, admin UI, transcripts, and guest metadata. v0.3+ adds Atom, JSON Feed, YouTube, text/video `media_type` support — at which point the tool is a self-hostable FeedBurner replacement.
+v0.3+ adds Atom, JSON Feed, YouTube, text/video `media_type` support — at which point the tool is a self-hostable FeedBurner replacement.
 
 ## Install
 
@@ -36,149 +36,97 @@ v0.2 wraps this in [PocketBase](https://pocketbase.io) for multi-feed orchestrat
 Multi-arch (amd64 + arm64) is published to GHCR on every tag.
 
 ```bash
-docker run --rm \
-  -v $(pwd)/public:/out \
-  ghcr.io/Startr/feeds:latest \
-  feeds rewrite \
-    --upstream      https://anchor.fm/s/YOUR_SHOW_ID/podcast/rss \
-    --output        /out/your-show.xml \
-    --self-url      https://feed.yourdomain.com/v1/your-show.xml \
-    --channel-title "Your Show" \
-    --channel-link  https://yourdomain.com/podcast
+docker run --rm -p 8090:8090 \
+  -e FEEDS_SOURCE_URL=https://anchor.fm/s/YOUR_SHOW_ID/podcast/rss \
+  -e FEEDS_SLUG=your-show \
+  -e FEEDS_DOMAIN=https://feed.yourdomain.com \
+  -e FEEDS_TITLE="Your Show" \
+  -e FEEDS_WEBSITE=https://yourdomain.com/podcast \
+  ghcr.io/Startr/feeds:latest
 ```
+
+Feed is served at `http://localhost:8090/v1/your-show.xml`. Admin UI at `http://localhost:8090/_/`.
 
 Pin to a specific release with `ghcr.io/Startr/feeds:0.0.4` (or any tag from the [Releases](https://github.com/Startr/feeds/releases) page).
-
-### From source with `go install`
-
-```bash
-go install github.com/Startr/feeds/cmd/feeds@latest
-feeds --help
-```
 
 ### From source with `make`
 
 ```bash
 git clone https://github.com/Startr/feeds && cd feeds
-make it_build       # produces startr/feeds:latest locally
+make it_build       # downloads PB binary + copies hooks → startr/feeds:latest
 ```
 
-### Binary tarballs (planned, v0.1.0+)
-
-Pre-built binary tarballs from GitHub Releases, signed with [Sigstore cosign](https://www.sigstore.dev/) and a SLSA Level 3 provenance attestation, are planned for v0.1.0. v0.0.x ships only the GHCR container and `go install` paths.
+No Go compiler needed — the Dockerfile downloads a pre-built PocketBase binary and copies in the JS hooks. Build time: seconds.
 
 ## Quick start
 
-Fetch the Spotify for Podcasters auto-feed for your show, rewrite branding to point at your own domain, output static XML to disk:
+Run the container with `FEEDS_*` env vars. PocketBase starts, runs the rewrite pipeline once immediately, then re-runs on the cron schedule (default: every 15 minutes):
 
 ```bash
-./feeds rewrite \
-  --source spotify \
-  --upstream https://anchor.fm/s/YOUR_SHOW_ID/podcast/rss \
-  --output ./public/v1/your-show.xml \
-  --self-url https://feed.yourdomain.com/v1/your-show.xml \
-  --channel-title "Your Show" \
-  --channel-link https://yourdomain.com/podcast
+docker run --rm -p 8090:8090 \
+  -v feeds-data:/app/pb_data \
+  -e FEEDS_SOURCE_URL=https://anchor.fm/s/YOUR_SHOW_ID/podcast/rss \
+  -e FEEDS_SLUG=your-show \
+  -e FEEDS_DOMAIN=https://feed.yourdomain.com \
+  -e FEEDS_TITLE="Your Show" \
+  -e FEEDS_WEBSITE=https://yourdomain.com/podcast \
+  ghcr.io/Startr/feeds:latest
 ```
 
-The binary runs once and exits with status zero on success. Wire it up to any scheduler.
+The rewritten feed is served at `/v1/your-show.xml`. The PocketBase admin UI is at `/_/`.
 
-## Scheduler examples
-
-Startr/feeds doesn't ship a built-in scheduler because schedulers are political. Cron is fine. Systemd timers are fine. GitHub Actions is fine if you trust GitHub. Pick yours.
-
-See [`examples/`](./examples/) for ready-to-copy configs:
-
-- `examples/github-actions.yml` — GitHub Actions on a 15-minute cadence
-- `examples/systemd-timer/` — systemd service + timer unit files
-- `examples/cron-on-raspberry-pi.txt` — plain crontab line
-- `examples/flyio-scheduled-task.toml` — fly.io scheduled machine
-- `examples/kubernetes-cronjob.yaml` — k8s CronJob resource
-- `examples/docker-compose-cron.yml` — Docker Compose with a cron sidecar
+For **multi-feed** setups, add feed configs in the admin UI instead of env vars — each record in the "feeds" collection is one feed to rewrite.
 
 ## Configuration
 
-v0.0.x is flag-driven. Every flag also reads from an environment variable so containerized deploys (CapRover, fly.io, k8s) can configure the binary without baking values into the CMD line. CLI flags still override env vars when explicitly passed (precedence: CLI flag > env var > literal default).
+Feed config can come from two places:
+
+1. **PocketBase "feeds" collection** (recommended for multi-feed) — manage via the admin UI at `/_/`. Each record is one feed to rewrite. The JS hook iterates over all records on each cron tick.
+2. **`FEEDS_*` environment variables** (single-feed shortcut) — used as fallback when no collection records exist. Great for quick deploys.
 
 ### Environment variables
 
-The same env var namespace applies to both `feeds rewrite` and `feeds serve`, so a single deploy config drives whichever subcommand the container runs.
+| Env var | Notes |
+|---|---|
+| `FEEDS_SOURCE_URL` | RSS feed URL to rewrite — **required** |
+| `FEEDS_SLUG` | feed identifier, e.g. `my-show` → serves at `/v1/my-show.xml` — **required** |
+| `FEEDS_DOMAIN` | your domain, e.g. `https://feed.example.com` — used for the `<atom:link rel="self">` URL |
+| `FEEDS_TITLE` | your show title — **required** |
+| `FEEDS_WEBSITE` | your show's homepage — **required** |
+| `FEEDS_COVER_IMAGE` | cover art URL — optional |
+| `FEEDS_ITUNES_AUTHOR` | iTunes author — optional |
+| `FEEDS_ITUNES_OWNER_EMAIL` | iTunes owner email — optional |
+| `FEEDS_CRON` | cron expression for rewrite schedule (default `*/15 * * * *`) |
+| `FEEDS_VERSION` | version string for `<generator>` tag (default `dev`) |
 
-| Env var | Flag | Notes |
-|---|---|---|
-| `FEEDS_SOURCE` | `--source` | `spotify` (default; v0.0.x ships spotify only) |
-| `FEEDS_UPSTREAM` | `--upstream` | upstream feed URL — **required** |
-| `FEEDS_OUTPUT` | `--output` | output XML path — **required** |
-| `FEEDS_SELF_URL` | `--self-url` | public URL subscribers bind to — **required** |
-| `FEEDS_CHANNEL_TITLE` | `--channel-title` | **required** |
-| `FEEDS_CHANNEL_LINK` | `--channel-link` | **required** |
-| `FEEDS_CHANNEL_IMAGE` | `--channel-image` | optional |
-| `FEEDS_ITUNES_AUTHOR` | `--itunes-author` | optional |
-| `FEEDS_ITUNES_OWNER_EMAIL` | `--itunes-owner-email` | optional |
-| `FEEDS_STATE` | `--state` | cache state file path (rewrite only; default `.feeds-state.json`) |
-| `FEEDS_INTERVAL` | `--interval` | tick interval for `feeds serve`, e.g. `15m`, `30s`, `2h` (default `15m`) |
-| `FEEDS_DIR` | `--dir` | data directory for `feeds serve` (default `/app/pb_data`) |
-| `FEEDS_HTTP` | `--http` | HTTP bind for `feeds serve` (reserved for v0.2; unused in v0.0.x) |
-| `FEEDS_HOOKS_DIR` | `--hooks-dir` | reserved for v0.2 PocketBase |
-| `FEEDS_MIGRATIONS_DIR` | `--migrations-dir` | reserved for v0.2 PocketBase |
-| `FEEDS_PUBLIC_DIR` | `--public-dir` | reserved for v0.2 PocketBase |
-| `FEEDS_CONFIG` | `--config` | reserved for v0.1.1+ YAML config |
-
-Bad `FEEDS_INTERVAL` values (unparseable by Go's `time.ParseDuration`) silently fall back to the default — env var typos shouldn't crash the container at startup.
+PocketBase's own flags (`--http`, `--dir`, `--publicDir`, `--hooksDir`, `--migrationsDir`) are set in the Dockerfile CMD or passed on the CLI. Run `feeds serve --help` to see all available PB flags.
 
 ### CapRover deploy
 
-The repo ships a [`captain-definition`](./captain-definition) at the root that pulls `ghcr.io/startr/feeds:latest`, layers in `pb_hooks/`, `pb_migrations/`, and `pb_public/` (forward-compat with v0.2 PocketBase + room for forks to ship custom assets), and runs `feeds serve` as the container CMD. No flags are baked in — env vars do all the configuration, so you can change a value in the CapRover dashboard without rebuilding.
+> **First time deploying?** Read [`docs/deploy-caprover.md`](./docs/deploy-caprover.md) for the full one-time setup walkthrough.
 
-> **First time deploying?** Read [`docs/deploy-caprover.md`](./docs/deploy-caprover.md) first. It walks through the **one-time** dashboard setup — creating the app, attaching a persistent volume, configuring nginx to serve the static XML off the volume, and mapping your `feed.yourdomain.com` subdomain — that has to happen *before* `caprover deploy --default` produces a working feed. The walkthrough covers verification with `curl`, validation against Apple Podcasts' parser, and common gotchas (404, 502, stale 304 cache, rollback). The summary below assumes that one-time setup is already done.
-
-CapRover one-click installs and `captain-definition`-built apps both expose env vars in the dashboard's **App Configs → Environment Variables** tab. Set the `FEEDS_*` vars there:
+The repo ships a [`captain-definition`](./captain-definition) at the root. CapRover builds from it and runs `feeds serve`. Set the `FEEDS_*` vars in the CapRover dashboard's **App Configs → Environment Variables** tab:
 
 ```
-FEEDS_UPSTREAM=https://anchor.fm/s/YOUR_SHOW_ID/podcast/rss
-FEEDS_OUTPUT=/app/pb_data/public/your-show.xml
-FEEDS_SELF_URL=https://feed.yourdomain.com/v1/your-show.xml
-FEEDS_CHANNEL_TITLE=Your Show
-FEEDS_CHANNEL_LINK=https://yourdomain.com/podcast
-FEEDS_CHANNEL_IMAGE=https://yourdomain.com/podcast/cover.jpg
+FEEDS_SOURCE_URL=https://anchor.fm/s/YOUR_SHOW_ID/podcast/rss
+FEEDS_SLUG=your-show
+FEEDS_DOMAIN=https://feed.yourdomain.com
+FEEDS_TITLE=Your Show
+FEEDS_WEBSITE=https://yourdomain.com/podcast
+FEEDS_COVER_IMAGE=https://yourdomain.com/podcast/cover.jpg
 FEEDS_ITUNES_AUTHOR=Your Name
 FEEDS_ITUNES_OWNER_EMAIL=you@yourdomain.com
-FEEDS_INTERVAL=15m
+FEEDS_CRON=*/15 * * * *
 ```
 
-Save and restart the app. `feeds serve` does the rewrite + ticker in one shot:
+Save and restart. `feeds serve`:
 
-1. Logs `feeds serve <version>: ticker mode, interval=15m, ...` on startup.
-2. **Runs the rewrite pipeline once immediately**, so subscribers get a fresh feed at deploy time — no waiting for the first tick.
-3. Re-runs the pipeline on every `FEEDS_INTERVAL` tick. 98% of polls short-circuit on HTTP 304 (`If-None-Match` / `If-Modified-Since`), so steady-state cost is ~one HTTP request per tick and zero disk I/O.
-4. On SIGTERM (CapRover stop / restart), shuts down cleanly.
+1. Starts PocketBase (HTTP server, admin UI at `/_/`, SQLite).
+2. **Runs the rewrite pipeline once immediately** — subscribers get a fresh feed at deploy time.
+3. Re-runs on the `FEEDS_CRON` schedule. 98% of polls short-circuit on HTTP 304.
+4. Serves the rewritten XML from `pb_public/` — no separate nginx or sidecar needed.
+5. Shuts down cleanly on SIGTERM.
 
-Point your subscriber URL (e.g., `feed.yourdomain.com/v1/your-show.xml`) at the CapRover app's persistent volume served by the built-in nginx — typically `/app/pb_data/public/your-show.xml` mapped to `/v1/your-show.xml` via a CapRover **HTTP Settings → nginx config** rewrite, or via a sidecar static server.
-
-### YAML config (v0.1.1+)
-
-YAML config file support lands in v0.1.1:
-
-```yaml
-# feeds.yaml (v0.1.1+)
-source: spotify
-upstream: https://anchor.fm/s/YOUR_SHOW_ID/podcast/rss
-output: ./public/v1/your-show.xml
-self_url: https://feed.yourdomain.com/v1/your-show.xml
-channel:
-  title: Your Show
-  link: https://yourdomain.com/podcast
-  image: https://yourdomain.com/podcast/cover.jpg
-itunes:
-  author: Your Name
-  owner_email: you@yourdomain.com
-```
-
-```bash
-./feeds rewrite --config ./feeds.yaml    # v0.1.1+
-```
-
-CLI flags will always override YAML when both are set.
 
 ## What gets rewritten, what doesn't
 
@@ -192,18 +140,18 @@ CLI flags will always override YAML when both are set.
 | `<itunes:author>`, `<itunes:owner>`, `<itunes:image>` | Rewritten to your branding |
 | `<item><enclosure url>` | **Left alone.** Points at the upstream audio host. This is intentional. |
 | `<item><guid>`, `<item><title>`, `<item><description>`, `<item><pubDate>` | Left alone. Episode-level content. |
-| Any unknown namespaced element | Left alone. Round-tripped via `beevik/etree`. |
+| Any unknown namespaced element | Left alone. Round-tripped via xml-js non-compact mode. |
 
 Enclosure URLs staying untouched is how v0.1.0 runs at zero cost: Spotify hosts the audio bytes for free. If you want to rehost audio yourself, that's a v1.0+ feature via an opt-in rehosting config.
 
 ## Build, release, and deploy
 
-This repo ships the `feeds` Go binary in a minimal Alpine container to GHCR, built with the canonical Sage CI/CD pattern (forked from `WEB-DB-sage-pb`). The Makefile is intentionally near-identical to its sibling — `make help` lists every target.
+This repo ships a pre-built PocketBase binary (renamed to `feeds`) with JS hooks in a minimal Alpine container to GHCR. No Go compiler needed — the Dockerfile downloads the PocketBase release, copies in `pb_hooks/`, `pb_migrations/`, and `pb_public/`, and that's it. Build time: seconds.
 
-The binary has two subcommands:
+Key commands:
 
-- `feeds rewrite` — single-shot fetch + rewrite + atomic write. Exits zero on success. Wire it up to any scheduler.
-- `feeds serve` — long-running ticker mode for always-on hosts (e.g., CapRover). v0.2 replaces the ticker with a PocketBase framework import for multi-feed orchestration and an admin UI.
+- `feeds serve` — PocketBase server + cron-driven JS hook rewrite pipeline. Serves rewritten feeds from `pb_public/`, admin UI at `/_/`, built-in scheduler. This is the primary deployment mode.
+- `feeds superuser` — create or update admin accounts for the PocketBase dashboard.
 
 ### Prerequisites (one-time)
 
@@ -218,7 +166,7 @@ You also need a container runtime. The Makefile auto-detects `podman` (preferred
 ### Local development
 
 ```bash
-make it_build              # 2-stage Go build → startr/feeds:latest (runs go vet + tests)
+make it_build              # downloads PB binary + copies hooks → startr/feeds:latest
 make it_run                # run on localhost:8090, data in volume startr-media-data
 make it_run_dev            # run with bind-mounted pb_hooks/, pb_migrations/, pb_public/
 make it_build_n_run        # build + run in one shot
@@ -276,7 +224,7 @@ make hotfix_and_push_GHCR
 
 ### Embedding widgets: you are NOT bound by AGPL
 
-Future versions of Startr/feeds will ship widgets (`<startrcast-player>`, `<startrcast-subscribe>`) alongside the rewriter. These widgets are AGPL-3.0.
+Startr/feeds ships widgets (`<startr-player>`, `<startr-subscribe>`) alongside the rewriter. These widgets are AGPL-3.0.
 
 **Important:** Embedding a widget via a remote `<script src>` from a hosted Startr/feeds instance does NOT infect your site with AGPL. You are referencing remote content, not redistributing or running modified code.
 
@@ -291,7 +239,7 @@ No CLA. Contributions accepted under the [Developer Certificate of Origin](./DCO
 
 ## Project name and trademark
 
-The names `Startr/feeds`, `Startr`, and `startrcast` are project marks reserved separately from the code license. See [TRADEMARK.md](./TRADEMARK.md). Forks that make substantive changes should use a different name.
+The names `Startr/feeds`, `Startr`, `startrcast`, `startr-player`, and `startr-subscribe` are project marks reserved separately from the code license. See [TRADEMARK.md](./TRADEMARK.md). Forks that make substantive changes should use a different name.
 
 ## Docs
 

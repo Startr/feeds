@@ -48,18 +48,13 @@ ifeq ($(RELEASE_VERSION),)
 	RELEASE_VERSION := $(GIT_TAG)
 endif
 
-# Binary version stamp for `feeds --version`. Uses the same RELEASE_VERSION
-# cascade (release branch name → git tag) that the rest of this Makefile
-# already uses — one source of truth for "what version is this", rooted in
-# git, not in file contents. Adds the "v" prefix that RELEASE_VERSION strips.
-# Falls back to "dev" on branches with neither a release branch nor a tag
-# (e.g., feature/* or bare develop during bootstrap).
-BINARY_VERSION := $(if $(RELEASE_VERSION),v$(RELEASE_VERSION),dev)
-
-# PocketBase version (override via .env or CLI: make it_build PB_VERSION=0.36.8)
-# Vestigial — v0.1.0 builds the Go feeds binary, not PocketBase. Kept so the
-# variable can be revived in v0.2 when the PocketBase framework lands.
+# PocketBase version — the Dockerfile downloads this pre-built binary.
+# Override via .env or CLI: make it_build PB_VERSION=0.36.8
 PB_VERSION ?= 0.36.8
+
+# Version stamp — used for image tagging. The container uses FEEDS_VERSION
+# env var at runtime (set in docker run / CapRover), not a compile-time stamp.
+BINARY_VERSION := $(if $(RELEASE_VERSION),v$(RELEASE_VERSION),dev)
 
 help:
 	@echo "======================================================="
@@ -111,10 +106,9 @@ it_gone:
 # Build
 # ---------------------------------------------------------------------------
 it_build:
-	@echo "Building Docker image with BuildKit enabled (binary version: $(BINARY_VERSION))..."
+	@echo "Building Docker image (PB $(PB_VERSION), version tag: $(BINARY_VERSION))..."
 	@export DOCKER_BUILDKIT=1 && \
 	$(CONTAINER_RUNTIME) build --load \
-		--build-arg VERSION=$(BINARY_VERSION) \
 		-t $(IMAGE_NAME):$(IMAGE_TAG) \
 		-t $(IMAGE_NAME):latest \
 		-t $(IMAGE_NAME):$(IMAGE_TAG)-$(SAFE_GIT_BRANCH) \
@@ -123,10 +117,9 @@ it_build:
 	@echo ""
 
 it_build_no_cache:
-	@echo "Building Docker image without cache (binary version: $(BINARY_VERSION))..."
+	@echo "Building Docker image without cache (PB $(PB_VERSION))..."
 	@export DOCKER_BUILDKIT=1 && \
 	$(CONTAINER_RUNTIME) build --no-cache --load \
-		--build-arg VERSION=$(BINARY_VERSION) \
 		-t $(IMAGE_NAME):$(IMAGE_TAG) \
 		-t $(IMAGE_NAME):latest \
 		-t $(IMAGE_NAME):$(IMAGE_TAG)-$(SAFE_GIT_BRANCH) \
@@ -150,22 +143,19 @@ it_build_n_run: it_build
 it_build_n_run_no_cache: it_build_no_cache
 	@make it_run
 
-# Run generic image with bind-mounted hooks/migrations/public for local dev.
-# v0.1.0: runs `feeds serve` (the long-running ticker). v0.2.0 will route
-# through PocketBase so the hook/migration/public mounts start mattering.
-# Note: v0.1.0 `feeds serve` requires --upstream / --output / --self-url /
-# --channel-title / --channel-link, which you must supply via .env or a
-# wrapper — this target is a stub until v0.2 makes it useful.
+# Run with bind-mounted hooks/migrations/public for local dev.
+# Edit pb_hooks/feeds.pb.js locally and restart to pick up changes.
+# Feed config via FEEDS_* env vars in .env or CapRover dashboard.
 it_run_dev:
 	$(CONTAINER_RUNTIME) run --rm -p $(PORT_MAPPING) \
 		-v $(VOLUME_DATA) \
 		-v $$(pwd)/pb_hooks:/app/pb_hooks:ro \
 		-v $$(pwd)/pb_migrations:/app/pb_migrations:ro \
-		-v $$(pwd)/pb_public:/app/pb_public:ro \
+		-v $$(pwd)/pb_public:/app/pb_public \
 		$(DOCKER_RUN_ENV_ARGS) \
 		--name $(CONTAINER_NAME) \
 		$(IMAGE_NAME):$(IMAGE_TAG) \
-		feeds serve --http=0.0.0.0:8090 --dir=/app/pb_data --hooks-dir=/app/pb_hooks --migrations-dir=/app/pb_migrations --public-dir=/app/pb_public
+		feeds serve --http=0.0.0.0:8090
 
 # Build and run with a throwaway volume (fresh-install test)
 it_build_n_test_fresh: it_build
@@ -204,7 +194,6 @@ define build_multi_arch
 	@make it_clean
 	@make ensure_builder
 	docker buildx build --platform linux/amd64,linux/arm64 \
-		--build-arg VERSION=$(BINARY_VERSION) \
 		-t $(1):$(IMAGE_TAG) \
 		-t $(1):latest \
 		--push .

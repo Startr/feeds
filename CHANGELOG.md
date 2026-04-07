@@ -8,16 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **PocketBase standalone + JS hooks.** The entire rewrite pipeline now runs as a PocketBase JS hook (`pb_hooks/feeds.pb.js`). The container downloads a pre-built PocketBase binary (renamed to `feeds` for branding) — no Go compiler, no compilation, build time in seconds. PocketBase provides: HTTP server, static file serving (`pb_public/`), admin UI at `/_/`, cron scheduler, SQLite, and graceful shutdown.
+- **Multi-feed from day one.** Feed configs are stored in a PocketBase "feeds" collection, managed via the admin UI at `/_/`. Each record is one feed to rewrite. Single-feed deploys can still use `FEEDS_*` env vars as a fallback.
+- `pb_hooks/feeds.pb.js` — the rewrite pipeline as a PocketBase JS hook. Fetches upstream RSS with conditional GET, rewrites channel-level branding via xml-js DOM manipulation, writes rewritten XML to `pb_public/`, stores cache state (ETag, Last-Modified) back to the collection record.
+- `pb_hooks/lib/xml-js.js` — vendored UMD bundle of [xml-js](https://github.com/nicknisi/xml-js) v1.6.11 for XML ↔ JS object conversion. Vendored via `npm pack` (see `pb_hooks/lib/LIBRARIES.md`).
+- `pb_migrations/1744156800_create_feeds.js` — creates the "feeds" collection schema on first boot.
 - `CHANGELOG.md` (this file).
-- Environment variable support for every flag on both `feeds rewrite` and `feeds serve`. Each flag now reads its default from a `FEEDS_*` env var (e.g. `FEEDS_UPSTREAM`, `FEEDS_OUTPUT`, `FEEDS_SELF_URL`, `FEEDS_CHANNEL_TITLE`, `FEEDS_INTERVAL`, …) so containerized deploys (CapRover, fly.io, k8s) can configure feeds without baking values into the CMD line. CLI flags still override env vars when explicitly passed — precedence is CLI flag > env var > literal default. The `envString` and `envDuration` helpers in `cmd/feeds/main.go` keep the per-flag wiring to one line. Bad `FEEDS_INTERVAL` values fall back silently to the default rather than crashing the container at startup. The README has a new "Environment variables" table and a CapRover deploy snippet.
-- `docs/deploy-caprover.md` — operator walkthrough for the one-time CapRover dashboard setup that has to happen before `caprover deploy --default` produces a working feed. Covers caprover CLI install, server login, app creation, persistent volume for `/app/pb_data`, env var configuration, domain + HTTPS via Let's Encrypt, two options for serving the static XML off the persistent volume (sidecar nginx vs CapRover's built-in nginx custom config), first deploy, verification with `curl` + Apple Podcasts validators, subsequent deploys, rollback, and a troubleshooting section for the common 404 / 502 / stale 304 cache failures. The README now links to it from the CapRover deploy section.
+- `FEEDS_CRON` env var for configuring the rewrite schedule using standard cron expressions (default `*/15 * * * *`). Replaces `FEEDS_INTERVAL`.
+- `FEEDS_VERSION` env var for stamping the `<generator>` tag (default `dev`).
+- `feeds superuser` command (from PocketBase) for creating/updating admin accounts for the dashboard.
+- `docs/deploy-caprover.md` — operator walkthrough for CapRover deployment.
 
 ### Changed
-- README updated to match v0.0.x reality: dropped the unshipped Sigstore cosign + GitHub Releases tarball install instructions, replaced the broken `--config /config.yaml` container example with the working flag form, added `<channel><generator>` to the rewrite scope table, renamed "Scope for v0.1.0" to "Current scope (v0.0.x)", and collapsed the "First release ever" block into a `<details>` since it has been done four times already (kept for forks bootstrapping fresh).
-- `captain-definition` simplified. The CMD line previously hardcoded `--http=0.0.0.0:8090 --dir=/app/pb_data --hooks-dir=/app/pb_hooks --migrations-dir=/app/pb_migrations --public-dir=/app/pb_public` — every one of those values is now either the binary's built-in default or settable via a `FEEDS_*` env var, so the CMD reduces to `["feeds", "serve"]`. CapRover env var changes no longer require rebuilding the captain image. The README's CapRover deploy section spells out the four-step startup behavior (`serve` runs the rewrite pipeline once immediately, then on the configured `FEEDS_INTERVAL` tick) so it's clear that no separate `feeds rewrite` invocation is needed at deploy time.
-
-### Fixed
-- `feeds rewrite --help` and `feeds serve --help` now exit with code 0 instead of code 1. The `flag.ErrHelp` sentinel was previously propagated as a regular error, causing the help screens to print `feeds serve: flag: help requested` to stderr and exit with a failure code despite working correctly. Both subcommand files now check `errors.Is(err, flag.ErrHelp)` after `fs.Parse` and return nil.
+- **Architecture: Go binary → PB standalone + JS hooks.** The Dockerfile no longer compiles Go code. It downloads the pre-built PocketBase binary and copies in `pb_hooks/`, `pb_migrations/`, and `pb_public/`. The Go pipeline code in `internal/` is kept as a reference implementation and high-performance fallback for large-scale multi-feed deployments.
+- **Scheduler:** `time.Ticker` → PocketBase's built-in cron via `cronAdd()` in the JS hook.
+- **Static file serving:** PocketBase serves `pb_public/` over HTTP. The JS hook writes output XML there. No external web server needed.
+- **Env var scope:** Feed-specific config uses `FEEDS_*` env vars (UPSTREAM, OUTPUT, SELF_URL, CHANNEL_*, ITUNES_*, CRON). PocketBase infrastructure flags (`--http`, `--dir`, `--publicDir`) come from the CLI / Dockerfile CMD — no env var duplication.
+- `FEEDS_INTERVAL` removed (replaced by `FEEDS_CRON`). `FEEDS_HTTP`, `FEEDS_DIR`, `FEEDS_PUBLIC_DIR`, `FEEDS_HOOKS_DIR`, `FEEDS_MIGRATIONS_DIR` removed (PocketBase handles these via its own flags).
+- Dockerfile rewritten: single-stage Alpine, downloads PocketBase binary, copies hooks/migrations/public. No Go build stage.
+- Makefile updated: removed `--build-arg VERSION=` from build targets (no Go compilation), updated `it_run_dev` for PB standalone.
+- README updated to reflect PB standalone + JS hooks architecture, multi-feed support, simplified install.
 
 ## [0.0.4] - 2026-04-07
 

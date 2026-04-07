@@ -1,6 +1,6 @@
 # Trademark Notice
 
-The names `Startr/feeds`, `Startr`, `startrcast`, and the Startr logo are project marks used to identify this project and its canonical releases. They are reserved separately from the code license.
+The names `Startr/feeds`, `Startr`, `startrcast`, `startr-player`, `startr-subscribe`, and the Startr logo are project marks used to identify this project and its canonical releases. They are reserved separately from the code license.
 
 The code is AGPL-3.0. The project name and marks are not. You can use the code under AGPL; you cannot use the name to imply that your fork is the canonical upstream.
 
@@ -15,7 +15,7 @@ The code is AGPL-3.0. The project name and marks are not. You can use the code u
 ## What you cannot do without permission
 
 - Call your fork `Startr/feeds` or use the `Startr` name in a way that implies it is the canonical project.
-- Use `startrcast` as your product name.
+- Use `startrcast`, `startr-player`, or `startr-subscribe` as your product name.
 - Use the Startr logo in a way that implies endorsement by the upstream maintainers.
 - Distribute modified binaries under the same project name.
 
