@@ -65,7 +65,7 @@ applyTheme();
 <h1>Embed Widgets</h1>
 <p style="--c: var(--text-muted); --mb: 2rem;">Pick a feed, copy the embed code, paste it on your site.</p>
 
-<div style="--bgc: var(--background); --b: 1px solid var(--border); --br: 8px; --p: 1.25rem; --m: 1rem 0;">
+<div style="--bgc: var(--background); --shadow: 6; --br: 8px; --p: 1.25rem; --m: 1rem 0;">
   <div style="--size: 0.75rem; --tt: uppercase; --ls: 0.05em; --c: var(--text-muted); --mb: 0.5rem;">Select a feed</div>
   <div id="feed-picker">
     <p style="--p: 1rem; --c: var(--text-muted); --fs: italic;" id="loading-msg">Loading feeds...</p>
@@ -157,7 +157,7 @@ applyTheme();
     html += '<ul id="feed-list" style="--list: none; --p: 0; --m: 0 0 0.75rem;">';
     for (var i = 0; i < feeds.length; i++) {
       var f = feeds[i];
-      html += '<li data-slug="' + esc(f.slug) + '" style="--p: 0.5rem 0.75rem; --b: 1px solid var(--border); --br: 6px; --cur: pointer; --mb: 4px; --d: flex; --jc: space-between; --ai: center;' + (i === 0 ? ' --bc: var(--primary); --bgc: var(--background-alt);' : '') + '">';
+      html += '<li data-slug="' + esc(f.slug) + '" style="--p: 0.5rem 0.75rem; --shadow: 6; --br: 6px; --cur: pointer; --mb: 4px; --d: flex; --jc: space-between; --ai: center;' + (i === 0 ? ' --bc: var(--primary); --bgc: var(--background-alt);' : '') + '">';
       html += '<span style="--weight: 600;">' + esc(f.title || f.slug) + '</span>';
       html += '<span style="--size: 0.8rem; --c: var(--text-muted); --ff: monospace;">/v1/' + esc(f.slug) + '.xml</span>';
       html += '</li>';
