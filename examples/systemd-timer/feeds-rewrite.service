@@ -1,0 +1,56 @@
+# =============================================================================
+# examples/systemd-timer/feeds-rewrite.service
+# -----------------------------------------------------------------------------
+# Systemd service unit for a single-shot rewrite. Paired with the .timer
+# file in this directory. Systemd timers are cron's spiritual successor on
+# modern Linux: better logging (journalctl), randomized delays to avoid
+# thundering herd, and automatic restart policies.
+#
+# To install:
+#   sudo useradd --system --home /var/lib/feeds --shell /usr/sbin/nologin feeds
+#   sudo mkdir -p /var/lib/feeds && sudo chown feeds:feeds /var/lib/feeds
+#   sudo cp examples/systemd-timer/feeds-rewrite.service /etc/systemd/system/
+#   sudo cp examples/systemd-timer/feeds-rewrite.timer   /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now feeds-rewrite.timer
+#   sudo systemctl status feeds-rewrite.timer
+#   sudo journalctl -u feeds-rewrite.service -f
+# =============================================================================
+
+[Unit]
+Description=Startr/feeds — scheduled feed rewrite
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=feeds
+Group=feeds
+WorkingDirectory=/var/lib/feeds
+
+# Hardening — the rewriter only needs to read upstream HTTPS, write to
+# /var/lib/feeds, and exit. Lock everything else down.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ReadWritePaths=/var/lib/feeds
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+ExecStart=/usr/local/bin/feeds rewrite \
+  --source spotify \
+  --upstream   https://anchor.fm/s/YOUR_SHOW_ID/podcast/rss \
+  --output     /var/lib/feeds/your-show.xml \
+  --self-url   https://feed.yourdomain.com/v1/your-show.xml \
+  --channel-title "Your Show" \
+  --channel-link  https://yourdomain.com/podcast \
+  --state      /var/lib/feeds/.feeds-state.json
+
+# Non-zero exit from the binary is a real failure. Systemd records it in the
+# journal and the timer still re-runs on schedule (no exponential backoff —
+# fail-loud is the contract).
+
+[Install]
+WantedBy=multi-user.target

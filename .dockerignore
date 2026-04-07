@@ -1,0 +1,24 @@
+# VCS / editor
+.git
+.gitignore
+.obsidian
+.claude
+
+# Local data — never bake into the image
+pb_data
+*.db
+*.db-shm
+*.db-wal
+
+# Docs / dev artifacts
+*.md
+DEVOPS-INBOX.md
+podcast-site-design.md
+resources.md
+
+# Node / build artifacts (in case they appear later)
+node_modules
+dist
+build
+.env
+.env.*

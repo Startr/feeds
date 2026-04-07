@@ -1,0 +1,80 @@
+# =============================================================================
+# examples/github-actions.yml
+# -----------------------------------------------------------------------------
+# Run `feeds rewrite` every 15 minutes from GitHub Actions and commit the
+# result to a gh-pages branch. Subscribers bind to the Pages URL (or to a
+# custom domain CNAME'd at the Pages URL).
+#
+# This is the zero-infra scheduler: no servers, no cron daemon, no fly.io
+# machine. If you already trust GitHub to host your repo, this is the cheapest
+# way to keep a feed fresh.
+#
+# To use:
+#   1. Copy this file to .github/workflows/feeds.yml in your repo
+#   2. Enable GitHub Pages for the repo, source = gh-pages branch
+#   3. Update the env vars below with your show's URLs and branding
+#   4. Commit and push. The workflow runs every 15 minutes on the schedule
+#      and can also be triggered manually from the Actions tab.
+# =============================================================================
+
+name: rewrite-feed
+
+on:
+  schedule:
+    # Every 15 minutes. GitHub may delay scheduled runs under load —
+    # this is fine because the pipeline is idempotent and fails loud.
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rewrite-feed
+  cancel-in-progress: false
+
+jobs:
+  rewrite:
+    runs-on: ubuntu-latest
+    env:
+      UPSTREAM:      https://anchor.fm/s/YOUR_SHOW_ID/podcast/rss
+      SELF_URL:      https://feed.yourdomain.com/v1/your-show.xml
+      CHANNEL_TITLE: Your Show
+      CHANNEL_LINK:  https://yourdomain.com/podcast
+    steps:
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          # Keep prior commits so subscribers see a stable URL history.
+          fetch-depth: 1
+
+      - name: Install feeds binary
+        run: |
+          curl -sSL https://github.com/Startr/feeds/releases/latest/download/feeds_linux_amd64.tar.gz \
+            | tar -xz
+          chmod +x ./feeds
+
+      - name: Rewrite feed
+        run: |
+          mkdir -p v1
+          ./feeds rewrite \
+            --source spotify \
+            --upstream   "${UPSTREAM}" \
+            --output     "v1/your-show.xml" \
+            --self-url   "${SELF_URL}" \
+            --channel-title "${CHANNEL_TITLE}" \
+            --channel-link  "${CHANNEL_LINK}" \
+            --state      ".feeds-state.json"
+
+      - name: Commit if changed
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name  'feeds-bot'
+            git config user.email 'feeds-bot@users.noreply.github.com'
+            git add v1/your-show.xml .feeds-state.json
+            git commit -m "feed: scheduled rewrite $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git push
+          else
+            echo "no feed changes"
+          fi

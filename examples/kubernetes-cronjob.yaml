@@ -1,0 +1,85 @@
+# =============================================================================
+# examples/kubernetes-cronjob.yaml
+# -----------------------------------------------------------------------------
+# Kubernetes CronJob that runs `feeds rewrite` every 15 minutes.
+#
+# A PersistentVolumeClaim holds the output XML and state file so subsequent
+# runs can short-circuit on HTTP 304. The output is exposed via a separate
+# Deployment (nginx or caddy) that mounts the same PVC read-only and serves
+# it behind an Ingress.
+#
+# To install:
+#   1. Edit the env vars below with your show's URLs and branding
+#   2. kubectl apply -f examples/kubernetes-cronjob.yaml
+#   3. Check:   kubectl get cronjob feeds-rewrite
+#               kubectl logs -l job-name=feeds-rewrite-<timestamp>
+# =============================================================================
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: feeds-data
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: feeds-rewrite
+spec:
+  schedule: "*/15 * * * *"
+  concurrencyPolicy: Forbid          # idempotent but don't stack if a run is slow
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0                # fail-loud — let the next scheduled run try
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: rewrite
+              image: ghcr.io/startr/feeds:latest
+              imagePullPolicy: IfNotPresent
+              command:
+                - feeds
+                - rewrite
+                - --source
+                - spotify
+                - --upstream
+                - https://anchor.fm/s/YOUR_SHOW_ID/podcast/rss
+                - --output
+                - /data/your-show.xml
+                - --self-url
+                - https://feed.yourdomain.com/v1/your-show.xml
+                - --channel-title
+                - Your Show
+                - --channel-link
+                - https://yourdomain.com/podcast
+                - --state
+                - /data/.feeds-state.json
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 500m
+                  memory: 128Mi
+              volumeMounts:
+                - name: data
+                  mountPath: /data
+              securityContext:
+                runAsNonRoot: true
+                runAsUser: 65532
+                readOnlyRootFilesystem: true
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: [ALL]
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: feeds-data

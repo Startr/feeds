@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 2,
+  "dockerfileLines": [
+    "FROM ghcr.io/startr/feeds:latest",
+    "COPY pb_hooks/ /app/pb_hooks/",
+    "COPY pb_migrations/ /app/pb_migrations/",
+    "COPY pb_public/ /app/pb_public/",
+    "CMD [\"feeds\", \"serve\", \"--http=0.0.0.0:8090\", \"--dir=/app/pb_data\", \"--hooks-dir=/app/pb_hooks\", \"--migrations-dir=/app/pb_migrations\", \"--public-dir=/app/pb_public\"]"
+  ]
+}

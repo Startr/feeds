@@ -1,0 +1,27 @@
+# =============================================================================
+# examples/systemd-timer/feeds-rewrite.timer
+# -----------------------------------------------------------------------------
+# Systemd timer that triggers feeds-rewrite.service every 15 minutes with a
+# randomized 60-second delay to avoid synchronized fetches if you run many
+# feeds on the same host.
+# =============================================================================
+
+[Unit]
+Description=Run Startr/feeds rewrite every 15 minutes
+Requires=feeds-rewrite.service
+
+[Timer]
+# Every 15 minutes, starting from boot.
+OnBootSec=2min
+OnUnitActiveSec=15min
+
+# Randomize within a 60-second window so parallel timers don't stampede.
+RandomizedDelaySec=60
+
+# If the system was off during a scheduled run, trigger immediately on boot.
+Persistent=true
+
+Unit=feeds-rewrite.service
+
+[Install]
+WantedBy=timers.target

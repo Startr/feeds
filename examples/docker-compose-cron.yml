@@ -1,0 +1,76 @@
+# =============================================================================
+# examples/docker-compose-cron.yml
+# -----------------------------------------------------------------------------
+# Docker Compose with a cron sidecar. The `feeds` service image is the same
+# one shipped to GHCR; the `cron` sidecar uses the classic supercronic +
+# entrypoint pattern to trigger `feeds rewrite` every 15 minutes inside a
+# running container network.
+#
+# Why this shape instead of a one-shot service?
+#   Docker Compose doesn't have first-class schedules, so the sidecar is the
+#   portable way to get cron semantics without depending on the host.
+#
+# To run:
+#   1. Copy this file to docker-compose.yml
+#   2. Edit the env vars
+#   3. docker compose up -d
+#   4. Tail logs:   docker compose logs -f feeds
+# =============================================================================
+
+services:
+  feeds:
+    image: ghcr.io/startr/feeds:latest
+    container_name: feeds
+    restart: unless-stopped
+    volumes:
+      - feeds-data:/data
+    # Long-running no-op container that the cron sidecar `docker exec`s into.
+    # We use `sleep infinity` instead of `feeds serve` because v0.1.0 serve
+    # runs its own ticker — we want cron to be the source of truth for the
+    # schedule so the config is consistent with the other examples.
+    command: ["sleep", "infinity"]
+    environment:
+      UPSTREAM:      https://anchor.fm/s/YOUR_SHOW_ID/podcast/rss
+      SELF_URL:      https://feed.yourdomain.com/v1/your-show.xml
+      CHANNEL_TITLE: Your Show
+      CHANNEL_LINK:  https://yourdomain.com/podcast
+
+  cron:
+    image: alpine:3.21
+    container_name: feeds-cron
+    restart: unless-stopped
+    depends_on: [feeds]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: |
+      sh -c '
+        apk add --no-cache docker-cli
+        echo "*/15 * * * * docker exec feeds feeds rewrite \
+          --source spotify \
+          --upstream \"$${UPSTREAM}\" \
+          --output /data/your-show.xml \
+          --self-url \"$${SELF_URL}\" \
+          --channel-title \"$${CHANNEL_TITLE}\" \
+          --channel-link \"$${CHANNEL_LINK}\" \
+          --state /data/.feeds-state.json" > /etc/crontabs/root
+        crond -f -L /dev/stdout
+      '
+    environment:
+      UPSTREAM:      https://anchor.fm/s/YOUR_SHOW_ID/podcast/rss
+      SELF_URL:      https://feed.yourdomain.com/v1/your-show.xml
+      CHANNEL_TITLE: Your Show
+      CHANNEL_LINK:  https://yourdomain.com/podcast
+
+  # Static file server that exposes /data as the public feed URL.
+  web:
+    image: caddy:2-alpine
+    container_name: feeds-web
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - feeds-data:/srv:ro
+    command: ["caddy", "file-server", "--root", "/srv", "--listen", ":80"]
+
+volumes:
+  feeds-data:

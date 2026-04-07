@@ -1,0 +1,22 @@
+# =============================================================================
+# examples/cron-on-raspberry-pi.txt
+# -----------------------------------------------------------------------------
+# Plain crontab line. Works on any POSIX system: Raspberry Pi, a closet Linux
+# box, a $5 DigitalOcean droplet, a shared host with cron access. This is the
+# "boring durable thing that just runs" scheduler.
+#
+# To install:
+#   1. Download the feeds binary to /usr/local/bin/feeds
+#        curl -sSL https://github.com/Startr/feeds/releases/latest/download/feeds_linux_arm64.tar.gz | sudo tar -xz -C /usr/local/bin/
+#        sudo chmod +x /usr/local/bin/feeds
+#   2. Create a directory for output + state:
+#        sudo mkdir -p /var/lib/feeds
+#   3. Run `crontab -e` and paste the line below (updating the flags).
+#   4. Verify with `crontab -l` and wait 15 minutes for first run.
+#   5. Serve /var/lib/feeds over HTTP with nginx, caddy, or anything else.
+# =============================================================================
+
+# Rewrite every 15 minutes. Logs go to /var/log/feeds.log. Stdout is
+# deliberately suppressed on 304 Not Modified so the log stays quiet in
+# steady state.
+*/15 * * * * /usr/local/bin/feeds rewrite --source spotify --upstream https://anchor.fm/s/YOUR_SHOW_ID/podcast/rss --output /var/lib/feeds/your-show.xml --self-url https://feed.yourdomain.com/v1/your-show.xml --channel-title "Your Show" --channel-link https://yourdomain.com/podcast --state /var/lib/feeds/.feeds-state.json >> /var/log/feeds.log 2>&1

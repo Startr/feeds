@@ -1,0 +1,55 @@
+# =============================================================================
+# examples/flyio-scheduled-task.toml
+# -----------------------------------------------------------------------------
+# fly.io scheduled machine. fly machines are lightweight ephemeral VMs that
+# can be woken on a schedule and run a command to completion. Pay-per-second.
+#
+# To use:
+#   1. Install flyctl: https://fly.io/docs/hands-on/install-flyctl/
+#   2. Copy this file to fly.toml in your repo
+#   3. Update the upstream, self-url, and branding env vars
+#   4. Create a volume for the output + state:
+#        flyctl volumes create feeds_data --size 1 --region iad
+#   5. Deploy:
+#        flyctl deploy
+#   6. Bind your custom domain to the fly app's IPv4/IPv6
+# =============================================================================
+
+app = "your-show-feeds"
+primary_region = "iad"
+
+[build]
+  image = "ghcr.io/startr/feeds:latest"
+
+[env]
+  UPSTREAM      = "https://anchor.fm/s/YOUR_SHOW_ID/podcast/rss"
+  SELF_URL      = "https://feed.yourdomain.com/v1/your-show.xml"
+  CHANNEL_TITLE = "Your Show"
+  CHANNEL_LINK  = "https://yourdomain.com/podcast"
+
+# A scheduled machine wakes up, runs the command, and exits. fly charges only
+# for the runtime (~1-2 seconds per invocation).
+[[processes]]
+  name = "rewrite"
+  cmd = [
+    "feeds", "rewrite",
+    "--source", "spotify",
+    "--upstream",      "$UPSTREAM",
+    "--output",        "/data/your-show.xml",
+    "--self-url",      "$SELF_URL",
+    "--channel-title", "$CHANNEL_TITLE",
+    "--channel-link",  "$CHANNEL_LINK",
+    "--state",         "/data/.feeds-state.json",
+  ]
+  schedule = "*/15 * * * *"
+
+[[mounts]]
+  source      = "feeds_data"
+  destination = "/data"
+  processes   = ["rewrite"]
+
+# Tiny VM — the Go binary only needs ~40 MB of RAM for the full rewrite path.
+[[vm]]
+  size      = "shared-cpu-1x"
+  memory_mb = 256
+  cpu_kind  = "shared"
