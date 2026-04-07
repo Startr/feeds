@@ -6,100 +6,105 @@
 <title>Embed Widgets — Startr/feeds</title>
 <link rel="stylesheet" href="https://startr.style/style.css">
 <script>
-(function() {
-  var saved = localStorage.getItem('theme');
-  if (saved) { document.documentElement.setAttribute('data-theme', saved); }
-  else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.documentElement.setAttribute('data-theme', 'dark');
+function setTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem("theme", theme);
+  var expiryTime = new Date().getTime() + 24 * 60 * 60 * 1000;
+  localStorage.setItem("themeExpiry", expiryTime);
+  updateThemeIcon(theme);
+}
+function applyTheme() {
+  var storedTheme = localStorage.getItem("theme");
+  var themeExpiry = localStorage.getItem("themeExpiry");
+  var currentTime = new Date().getTime();
+  // #TODO: on expiry, fall back to system preference instead of last manual choice
+  if (themeExpiry && currentTime > themeExpiry) {
+    localStorage.removeItem("theme");
+    localStorage.removeItem("themeExpiry");
   }
-})();
+  if (storedTheme) {
+    setTheme(storedTheme);
+  } else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    setTheme("dark");
+  } else {
+    setTheme("light");
+  }
+}
+// #TODO: cycle light → dark → system (remove data-theme, let @media take over)
+function toggleTheme() {
+  var currentTheme = document.documentElement.getAttribute("data-theme");
+  if (currentTheme === "dark") {
+    setTheme("light");
+  } else {
+    setTheme("dark");
+  }
+}
+function updateThemeIcon(theme) {
+  var icon = document.getElementById("theme-icon");
+  if (!icon) return;
+  if (theme === "dark") {
+    icon.innerHTML = '<path fill-rule="evenodd" clip-rule="evenodd" d="M17.715 15.15A6.5 6.5 0 0 1 9 6.035C6.106 6.922 4 9.645 4 12.867c0 3.94 3.153 7.136 7.042 7.136 3.101 0 5.734-2.032 6.673-4.853Z"></path><path d="m17.715 15.15.95.316a1 1 0 0 0-1.445-1.185l.495.869ZM9 6.035l.846.534a1 1 0 0 0-1.14-1.49L9 6.035Zm8.221 8.246a5.47 5.47 0 0 1-2.72.718v2a7.47 7.47 0 0 0 3.71-.98l-.99-1.738Zm-2.72.718A5.5 5.5 0 0 1 9 9.5H7a7.5 7.5 0 0 0 7.5 7.5v-2ZM9 9.5c0-1.079.31-2.082.845-2.93L8.153 5.5A7.47 7.47 0 0 0 7 9.5h2Zm-4 3.368C5 10.089 6.815 7.75 9.292 6.99L8.706 5.08C5.397 6.094 3 9.201 3 12.867h2Zm6.042 6.136C7.718 19.003 5 16.268 5 12.867H3c0 4.48 3.588 8.136 8.042 8.136v-2Zm5.725-4.17c-.81 2.433-3.074 4.17-5.725 4.17v2c3.552 0 6.553-2.327 7.622-5.537l-1.897-.632Z"></path><path fill-rule="evenodd" clip-rule="evenodd" d="M17 3a1 1 0 0 1 1 1 2 2 0 0 0 2 2 1 1 0 1 1 0 2 2 2 0 0 0-2 2 1 1 0 1 1-2 0 2 2 0 0 0-2-2 1 1 0 1 1 0-2 2 2 0 0 0 2-2 1 1 0 0 1 1-1Z"></path>';
+  } else {
+    icon.innerHTML = '<path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"></path><path d="M12 4v1M17.66 6.344l-.828.828M20.005 12.004h-1M17.66 17.664l-.828-.828M12 20.01V19M6.34 17.664l.835-.836M3.995 12.004h1.01M6 6l.835.836"></path>';
+  }
+}
+applyTheme();
 </script>
-<style>
-  /* Custom tokens not in startr.style */
-  :root { --accent: #2563eb; --card: var(--background); --code-bg: #f3f4f6; }
-  [data-theme="dark"] { --accent: #60a5fa; --code-bg: #222; }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --accent: #60a5fa; --code-bg: #222; } }
-
-  /* Page layout */
-  body { padding: 2rem 1rem; max-width: 720px; margin: 0 auto; }
-  h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }
-  h2 { font-size: 1.2rem; margin-top: 2rem; margin-bottom: 0.75rem; color: var(--accent); }
-  p { margin-bottom: 0.75rem; }
-  a { color: var(--accent); }
-  .subtitle { color: var(--text-muted); margin-bottom: 2rem; }
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; margin: 1rem 0; }
-  label { display: block; font-size: 0.9rem; font-weight: 600; margin-bottom: 0.25rem; }
-  input, select { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; font-family: inherit; background: var(--background); color: var(--text-main); margin-bottom: 0.75rem; }
-  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
-  .feed-picker { position: relative; }
-  .feed-picker-search { display: none; margin-bottom: 0.75rem; }
-  .feed-picker-search.active { display: block; }
-  .feed-list { list-style: none; margin: 0 0 0.75rem; padding: 0; }
-  .feed-list li { padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
-  .feed-list li:hover { border-color: var(--accent); background: var(--code-bg); }
-  .feed-list li.selected { border-color: var(--accent); background: var(--code-bg); }
-  .feed-list .feed-title { font-weight: 600; }
-  .feed-list .feed-slug { font-size: 0.8rem; color: var(--text-muted); font-family: monospace; }
-  .feed-manual { font-size: 0.85rem; color: var(--text-muted); cursor: pointer; margin-bottom: 0.75rem; }
-  .feed-manual:hover { color: var(--accent); }
-  .manual-input { display: none; }
-  .manual-input.active { display: block; }
-  .snippet { position: relative; }
-  pre { background: var(--code-bg); border-radius: 6px; padding: 1rem; font-size: 0.85rem; overflow-x: auto; white-space: pre-wrap; word-break: break-all; color: var(--text-main); }
-  .copy-btn { position: absolute; top: 8px; right: 8px; background: var(--accent); color: #fff; border: none; border-radius: 4px; padding: 4px 10px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
-  .copy-btn:hover { opacity: 0.85; }
-  .section-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.5rem; }
-  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
-  footer { color: var(--text-muted); font-size: 0.85rem; margin-top: 2rem; }
-  .preview-area { margin-top: 1rem; padding: 1rem; background: var(--code-bg); border-radius: 8px; }
-  .no-feeds { padding: 1rem; color: var(--text-muted); font-style: italic; }
-</style>
 </head>
-<body>
+<body style="--p: 2rem 1rem; --maxw: 720px; --m: 0 auto;">
+
+<theme-toggle onclick="toggleTheme()" style="--bgc: var(--background-alt); --c: var(--text-main); --op: 50%; --pos: fixed; --top: 0; --right: 0; --p: 0.2em; --bblr: 1em; --z: 1000; --cur: pointer;">
+  <svg id="theme-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+    <path d="M12 2a10 10 0 0110 10 10 10 0 01-10 10A10 10 0 112 12 10 10 0 0112 2zm0-2a12 12 0 1012 12A12 12 0 0012 0z"/>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M17.715 15.15A6.5 6.5 0 0 1 9 6.035C6.106 6.922 4 9.645 4 12.867c0 3.94 3.153 7.136 7.042 7.136 3.101 0 5.734-2.032 6.673-4.853Z"></path>
+    <path d="m17.715 15.15.95.316a1 1 0 0 0-1.445-1.185l.495.869ZM9 6.035l.846.534a1 1 0 0 0-1.14-1.49L9 6.035Zm8.221 8.246a5.47 5.47 0 0 1-2.72.718v2a7.47 7.47 0 0 0 3.71-.98l-.99-1.738Zm-2.72.718A5.5 5.5 0 0 1 9 9.5H7a7.5 7.5 0 0 0 7.5 7.5v-2ZM9 9.5c0-1.079.31-2.082.845-2.93L8.153 5.5A7.47 7.47 0 0 0 7 9.5h2Zm-4 3.368C5 10.089 6.815 7.75 9.292 6.99L8.706 5.08C5.397 6.094 3 9.201 3 12.867h2Zm6.042 6.136C7.718 19.003 5 16.268 5 12.867H3c0 4.48 3.588 8.136 8.042 8.136v-2Zm5.725-4.17c-.81 2.433-3.074 4.17-5.725 4.17v2c3.552 0 6.553-2.327 7.622-5.537l-1.897-.632Z"></path>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M17 3a1 1 0 0 1 1 1 2 2 0 0 0 2 2 1 1 0 1 1 0 2 2 2 0 0 0-2 2 1 1 0 1 1-2 0 2 2 0 0 0-2-2 1 1 0 1 1 0-2 2 2 0 0 0 2-2 1 1 0 0 1 1-1Z"></path>
+  </svg>
+</theme-toggle>
 
 <h1>Embed Widgets</h1>
-<p class="subtitle">Pick a feed, copy the embed code, paste it on your site.</p>
+<p style="--c: var(--text-muted); --mb: 2rem;">Pick a feed, copy the embed code, paste it on your site.</p>
 
-<div class="card">
-  <div class="section-label">Select a feed</div>
-  <div id="feed-picker" class="feed-picker">
-    <p class="no-feeds" id="loading-msg">Loading feeds...</p>
+<div style="--bgc: var(--background); --b: 1px solid var(--border); --br: 8px; --p: 1.25rem; --m: 1rem 0;">
+  <div style="--size: 0.75rem; --tt: uppercase; --ls: 0.05em; --c: var(--text-muted); --mb: 0.5rem;">Select a feed</div>
+  <div id="feed-picker">
+    <p style="--p: 1rem; --c: var(--text-muted); --fs: italic;" id="loading-msg">Loading feeds...</p>
   </div>
-  <div id="manual-toggle" class="feed-manual" style="display:none">or enter a feed URL manually</div>
-  <div id="manual-section" class="manual-input">
-    <label for="feed-url">Feed URL</label>
+  <div id="manual-toggle" style="--size: 0.85rem; --c: var(--text-muted); --cur: pointer; --mb: 0.75rem; --d: none;">or enter a feed URL manually</div>
+  <div id="manual-section" style="--d: none;">
+    <label for="feed-url" style="--weight: 600; --size: 0.9rem; --mb: 0.25rem;">Feed URL</label>
     <input type="url" id="feed-url" placeholder="https://feed.example.com/v1/your-show.xml">
   </div>
 
-  <div class="section-label" style="margin-top:1rem">Feed URL</div>
-  <div style="display:flex;gap:8px;margin-bottom:0.75rem">
-    <input type="text" id="feed-url-display" readonly style="flex:1;background:var(--code-bg);cursor:text" value="">
-    <button class="copy-btn" style="position:static" onclick="copyFeedUrl()">Copy URL</button>
+  <div style="--size: 0.75rem; --tt: uppercase; --ls: 0.05em; --c: var(--text-muted); --mb: 0.5rem; --mt: 1rem;">Feed URL</div>
+  <div style="--d: flex; --g: 8px; --mb: 0.75rem;">
+    <input type="text" id="feed-url-display" readonly style="--fg: 1; --bgc: var(--background-alt);" value="">
+    <button onclick="copyFeedUrl()">Copy URL</button>
   </div>
 
-  <div class="section-label" style="margin-top:1rem">Subscribe links (optional)</div>
-  <label for="apple-url">Apple Podcasts URL</label>
+  <div style="--size: 0.75rem; --tt: uppercase; --ls: 0.05em; --c: var(--text-muted); --mb: 0.5rem; --mt: 1rem;">Subscribe links (optional)</div>
+  <label for="apple-url" style="--weight: 600; --size: 0.9rem; --mb: 0.25rem;">Apple Podcasts URL</label>
   <input type="url" id="apple-url" placeholder="https://podcasts.apple.com/podcast/id123456">
-  <label for="spotify-url">Spotify URL</label>
+  <label for="spotify-url" style="--weight: 600; --size: 0.9rem; --mb: 0.25rem;">Spotify URL</label>
   <input type="url" id="spotify-url" placeholder="https://open.spotify.com/show/abc123">
 </div>
 
-<h2>Player Widget</h2>
+<h2 style="--c: var(--primary); --mt: 2rem; --mb: 0.75rem;">Player Widget</h2>
 <p>Drop this on any page. The player fetches your RSS feed, shows episode artwork, and lets visitors play episodes.</p>
-<div class="snippet">
-  <button class="copy-btn" onclick="copySnippet('player-code')">Copy</button>
+<div style="--pos: relative;">
+  <button style="--pos: absolute; --top: 8px; --right: 8px; --z: 1;" onclick="copySnippet('player-code')">Copy</button>
   <pre id="player-code"></pre>
 </div>
 
-<h2>Subscribe Widget</h2>
+<h2 style="--c: var(--primary); --mt: 2rem; --mb: 0.75rem;">Subscribe Widget</h2>
 <p>Shows "Listen on" badges for each platform you configure. Only platforms with URLs will render.</p>
-<div class="snippet">
-  <button class="copy-btn" onclick="copySnippet('subscribe-code')">Copy</button>
+<div style="--pos: relative;">
+  <button style="--pos: absolute; --top: 8px; --right: 8px; --z: 1;" onclick="copySnippet('subscribe-code')">Copy</button>
   <pre id="subscribe-code"></pre>
 </div>
 
-<h2>Live Preview</h2>
-<div class="preview-area" id="preview"></div>
+<h2 style="--c: var(--primary); --mt: 2rem; --mb: 0.75rem;">Live Preview</h2>
+<div id="preview" style="--mt: 1rem; --p: 1rem; --bgc: var(--background-alt); --br: 8px;"></div>
 
 <hr>
 <footer>
@@ -139,45 +144,44 @@
 
   function renderPicker() {
     if (feeds.length === 0) {
-      picker.innerHTML = '<p class="no-feeds">No feeds configured yet. <a href="/_/">Add one in the admin dashboard</a>, or enter a URL below.</p>';
+      picker.innerHTML = '<p style="--p: 1rem; --c: var(--text-muted); --fs: italic;">No feeds configured yet. <a href="/_/">Add one in the admin dashboard</a>, or enter a URL below.</p>';
       manualToggle.style.display = 'none';
-      manualSection.classList.add('active');
+      manualSection.style.display = 'block';
       return;
     }
 
-    // Single feed: just show it selected, no search
-    // Multiple feeds: add a search filter
     var html = '';
     if (feeds.length > 1) {
-      html += '<input type="text" id="feed-search" class="feed-picker-search active" placeholder="Search feeds...">';
+      html += '<input type="text" id="feed-search" placeholder="Search feeds..." style="--mb: 0.75rem;">';
     }
-    html += '<ul class="feed-list" id="feed-list">';
+    html += '<ul id="feed-list" style="--list: none; --p: 0; --m: 0 0 0.75rem;">';
     for (var i = 0; i < feeds.length; i++) {
       var f = feeds[i];
-      html += '<li data-slug="' + esc(f.slug) + '"' + (i === 0 ? ' class="selected"' : '') + '>';
-      html += '<span class="feed-title">' + esc(f.title || f.slug) + '</span>';
-      html += '<span class="feed-slug">/v1/' + esc(f.slug) + '.xml</span>';
+      html += '<li data-slug="' + esc(f.slug) + '" style="--p: 0.5rem 0.75rem; --b: 1px solid var(--border); --br: 6px; --cur: pointer; --mb: 4px; --d: flex; --jc: space-between; --ai: center;' + (i === 0 ? ' --bc: var(--primary); --bgc: var(--background-alt);' : '') + '">';
+      html += '<span style="--weight: 600;">' + esc(f.title || f.slug) + '</span>';
+      html += '<span style="--size: 0.8rem; --c: var(--text-muted); --ff: monospace;">/v1/' + esc(f.slug) + '.xml</span>';
       html += '</li>';
     }
     html += '</ul>';
     picker.innerHTML = html;
 
-    // Select first feed
     selectedSlug = feeds[0].slug;
 
-    // Click to select
     var list = document.getElementById('feed-list');
     list.addEventListener('click', function(ev) {
       var li = ev.target.closest('li');
       if (!li) return;
       var items = list.querySelectorAll('li');
-      for (var j = 0; j < items.length; j++) items[j].classList.remove('selected');
-      li.classList.add('selected');
+      for (var j = 0; j < items.length; j++) {
+        items[j].style.setProperty('--bc', 'var(--border)');
+        items[j].style.setProperty('--bgc', 'transparent');
+      }
+      li.style.setProperty('--bc', 'var(--primary)');
+      li.style.setProperty('--bgc', 'var(--background-alt)');
       selectedSlug = li.getAttribute('data-slug');
       update();
     });
 
-    // Search filter
     var search = document.getElementById('feed-search');
     if (search) {
       search.addEventListener('input', function() {
@@ -185,19 +189,21 @@
         var items = list.querySelectorAll('li');
         for (var j = 0; j < items.length; j++) {
           var slug = items[j].getAttribute('data-slug').toLowerCase();
-          var title = (items[j].querySelector('.feed-title').textContent || '').toLowerCase();
+          var title = (items[j].querySelector('[style*="--weight"]').textContent || '').toLowerCase();
           items[j].style.display = (slug.indexOf(q) !== -1 || title.indexOf(q) !== -1) ? '' : 'none';
         }
       });
     }
 
-    // Show manual toggle
     manualToggle.style.display = '';
     manualToggle.addEventListener('click', function() {
       selectedSlug = '';
       var items = list.querySelectorAll('li');
-      for (var j = 0; j < items.length; j++) items[j].classList.remove('selected');
-      manualSection.classList.toggle('active');
+      for (var j = 0; j < items.length; j++) {
+        items[j].style.setProperty('--bc', 'var(--border)');
+        items[j].style.setProperty('--bgc', 'transparent');
+      }
+      manualSection.style.display = manualSection.style.display === 'block' ? 'none' : 'block';
       update();
     });
   }
@@ -208,16 +214,13 @@
     var spotify = spotifyInput.value.trim();
     var feedDisplay = feed || base() + '/v1/your-show.xml';
 
-    // Feed URL display
     var urlDisplay = document.getElementById('feed-url-display');
     if (urlDisplay) urlDisplay.value = feedDisplay;
 
-    // Player snippet
     playerCode.textContent =
       '<script src="' + base() + '/widgets/player.js"><\/script>\n' +
       '<startr-player feed="' + esc(feedDisplay) + '"><\/startr-player>';
 
-    // Subscribe snippet
     var subAttrs = '';
     if (apple) subAttrs += '\n  apple="' + esc(apple) + '"';
     if (spotify) subAttrs += '\n  spotify="' + esc(spotify) + '"';
@@ -227,7 +230,6 @@
       '<script src="' + base() + '/widgets/subscribe.js"><\/script>\n' +
       '<startr-subscribe' + subAttrs + '>\n<\/startr-subscribe>';
 
-    // Live preview
     preview.innerHTML = '';
     if (feed) {
       var player = document.createElement('startr-player');
@@ -245,14 +247,16 @@
 
   feedInput.addEventListener('input', function() {
     selectedSlug = '';
-    var items = document.querySelectorAll('.feed-list li');
-    for (var j = 0; j < items.length; j++) items[j].classList.remove('selected');
+    var items = document.querySelectorAll('#feed-list li');
+    for (var j = 0; j < items.length; j++) {
+      items[j].style.setProperty('--bc', 'var(--border)');
+      items[j].style.setProperty('--bgc', 'transparent');
+    }
     update();
   });
   appleInput.addEventListener('input', update);
   spotifyInput.addEventListener('input', update);
 
-  // Load feeds from public API
   fetch('/api/feeds/public')
     .then(function(r) { return r.ok ? r.json() : Promise.reject(); })
     .then(function(data) {
@@ -269,9 +273,9 @@
 
 function copySnippet(id) {
   var pre = document.getElementById(id);
-  if (!navigator.clipboard) return;
+  if (!pre || !navigator.clipboard) return;
   navigator.clipboard.writeText(pre.textContent).then(function() {
-    var btn = pre.parentNode.querySelector('.copy-btn');
+    var btn = pre.parentNode.querySelector('button');
     btn.textContent = 'Copied!';
     setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
   });

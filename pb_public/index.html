@@ -13,147 +13,162 @@
 <link rel="alternate" type="application/rss+xml" title="Startr/feeds" href="/v1/">
 <link rel="stylesheet" href="https://startr.style/style.css">
 <script>
-// Dark mode: check saved preference, then system preference
-(function() {
-  var saved = localStorage.getItem('theme');
-  if (saved) { document.documentElement.setAttribute('data-theme', saved); }
-  else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.documentElement.setAttribute('data-theme', 'dark');
+function setTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem("theme", theme);
+  var expiryTime = new Date().getTime() + 24 * 60 * 60 * 1000;
+  localStorage.setItem("themeExpiry", expiryTime);
+  updateThemeIcon(theme);
+}
+function applyTheme() {
+  var storedTheme = localStorage.getItem("theme");
+  var themeExpiry = localStorage.getItem("themeExpiry");
+  var currentTime = new Date().getTime();
+  // #TODO: on expiry, fall back to system preference instead of last manual choice
+  if (themeExpiry && currentTime > themeExpiry) {
+    localStorage.removeItem("theme");
+    localStorage.removeItem("themeExpiry");
   }
-})();
+  if (storedTheme) {
+    setTheme(storedTheme);
+  } else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    setTheme("dark");
+  } else {
+    setTheme("light");
+  }
+}
+// #TODO: cycle light → dark → system (remove data-theme, let @media take over)
+function toggleTheme() {
+  var currentTheme = document.documentElement.getAttribute("data-theme");
+  if (currentTheme === "dark") {
+    setTheme("light");
+  } else {
+    setTheme("dark");
+  }
+}
+function updateThemeIcon(theme) {
+  var icon = document.getElementById("theme-icon");
+  if (!icon) return;
+  if (theme === "dark") {
+    icon.innerHTML = '<path fill-rule="evenodd" clip-rule="evenodd" d="M17.715 15.15A6.5 6.5 0 0 1 9 6.035C6.106 6.922 4 9.645 4 12.867c0 3.94 3.153 7.136 7.042 7.136 3.101 0 5.734-2.032 6.673-4.853Z"></path><path d="m17.715 15.15.95.316a1 1 0 0 0-1.445-1.185l.495.869ZM9 6.035l.846.534a1 1 0 0 0-1.14-1.49L9 6.035Zm8.221 8.246a5.47 5.47 0 0 1-2.72.718v2a7.47 7.47 0 0 0 3.71-.98l-.99-1.738Zm-2.72.718A5.5 5.5 0 0 1 9 9.5H7a7.5 7.5 0 0 0 7.5 7.5v-2ZM9 9.5c0-1.079.31-2.082.845-2.93L8.153 5.5A7.47 7.47 0 0 0 7 9.5h2Zm-4 3.368C5 10.089 6.815 7.75 9.292 6.99L8.706 5.08C5.397 6.094 3 9.201 3 12.867h2Zm6.042 6.136C7.718 19.003 5 16.268 5 12.867H3c0 4.48 3.588 8.136 8.042 8.136v-2Zm5.725-4.17c-.81 2.433-3.074 4.17-5.725 4.17v2c3.552 0 6.553-2.327 7.622-5.537l-1.897-.632Z"></path><path fill-rule="evenodd" clip-rule="evenodd" d="M17 3a1 1 0 0 1 1 1 2 2 0 0 0 2 2 1 1 0 1 1 0 2 2 2 0 0 0-2 2 1 1 0 1 1-2 0 2 2 0 0 0-2-2 1 1 0 1 1 0-2 2 2 0 0 0 2-2 1 1 0 0 1 1-1Z"></path>';
+  } else {
+    icon.innerHTML = '<path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"></path><path d="M12 4v1M17.66 6.344l-.828.828M20.005 12.004h-1M17.66 17.664l-.828-.828M12 20.01V19M6.34 17.664l.835-.836M3.995 12.004h1.01M6 6l.835.836"></path>';
+  }
+}
+applyTheme();
 </script>
-<style>
-  /* Custom tokens not in startr.style */
-  :root { --accent: #2563eb; --card: var(--background); --code-bg: #f3f4f6; }
-  [data-theme="dark"] { --accent: #60a5fa; --code-bg: #222; }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --accent: #60a5fa; --code-bg: #222; } }
-
-  /* Page layout */
-  body { padding: 2rem 1rem; max-width: 720px; margin: 0 auto; }
-  h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }
-  h2 { font-size: 1.2rem; margin-top: 2rem; margin-bottom: 0.75rem; color: var(--accent); }
-  h3 { font-size: 1rem; margin-top: 1.5rem; margin-bottom: 0.5rem; }
-  p { margin-bottom: 0.75rem; }
-  a { color: var(--accent); }
-  .subtitle { color: var(--text-muted); margin-bottom: 2rem; }
-  .admin-link { display: inline-block; background: var(--accent); color: #fff; padding: 0.6rem 1.4rem; border-radius: 6px; text-decoration: none; font-weight: 600; margin: 1rem 0; }
-  .admin-link:hover { opacity: 0.9; }
-  table { width: 100%; border-collapse: collapse; margin: 0.75rem 0 1.5rem; }
-  th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
-  th { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); }
-  td:first-child { font-weight: 600; white-space: nowrap; width: 30%; }
-  .example { color: var(--text-muted); font-size: 0.9rem; }
-  code { background: var(--code-bg); padding: 0.15em 0.4em; border-radius: 3px; font-size: 0.9em; }
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; margin: 1rem 0; }
-  .section-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.5rem; }
-  .derived { background: var(--code-bg); border-radius: 6px; padding: 0.75rem 1rem; margin: 0.5rem 0 1rem; font-size: 0.9rem; }
-  .derived strong { color: var(--accent); }
-  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
-  footer { color: var(--text-muted); font-size: 0.85rem; margin-top: 2rem; }
-</style>
 </head>
-<body>
+<body style="--p: 2rem 1rem; --maxw: 720px; --m: 0 auto;">
+
+<theme-toggle onclick="toggleTheme()" style="--bgc: var(--background-alt); --c: var(--text-main); --op: 50%; --pos: fixed; --top: 0; --right: 0; --p: 0.2em; --bblr: 1em; --z: 1000; --cur: pointer;">
+  <svg id="theme-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+    <path d="M12 2a10 10 0 0110 10 10 10 0 01-10 10A10 10 0 112 12 10 10 0 0112 2zm0-2a12 12 0 1012 12A12 12 0 0012 0z"/>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M17.715 15.15A6.5 6.5 0 0 1 9 6.035C6.106 6.922 4 9.645 4 12.867c0 3.94 3.153 7.136 7.042 7.136 3.101 0 5.734-2.032 6.673-4.853Z"></path>
+    <path d="m17.715 15.15.95.316a1 1 0 0 0-1.445-1.185l.495.869ZM9 6.035l.846.534a1 1 0 0 0-1.14-1.49L9 6.035Zm8.221 8.246a5.47 5.47 0 0 1-2.72.718v2a7.47 7.47 0 0 0 3.71-.98l-.99-1.738Zm-2.72.718A5.5 5.5 0 0 1 9 9.5H7a7.5 7.5 0 0 0 7.5 7.5v-2ZM9 9.5c0-1.079.31-2.082.845-2.93L8.153 5.5A7.47 7.47 0 0 0 7 9.5h2Zm-4 3.368C5 10.089 6.815 7.75 9.292 6.99L8.706 5.08C5.397 6.094 3 9.201 3 12.867h2Zm6.042 6.136C7.718 19.003 5 16.268 5 12.867H3c0 4.48 3.588 8.136 8.042 8.136v-2Zm5.725-4.17c-.81 2.433-3.074 4.17-5.725 4.17v2c3.552 0 6.553-2.327 7.622-5.537l-1.897-.632Z"></path>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M17 3a1 1 0 0 1 1 1 2 2 0 0 0 2 2 1 1 0 1 1 0 2 2 2 0 0 0-2 2 1 1 0 1 1-2 0 2 2 0 0 0-2-2 1 1 0 1 1 0-2 2 2 0 0 0 2-2 1 1 0 0 1 1-1Z"></path>
+  </svg>
+</theme-toggle>
 
 <h1>Startr/feeds</h1>
-<p class="subtitle">Self-hosted feed rewriter &mdash; own your subscriber URL, rent the audio host.</p>
+<p style="--c: var(--text-muted); --mb: 2rem;">Self-hosted feed rewriter &mdash; own your subscriber URL, rent the audio host.</p>
 
-<a class="admin-link" href="/_/">Open Admin Dashboard</a>
+<a href="/_/" style="--d: inline-block; --bgc: var(--primary); --c: var(--white); --p: 0.6rem 1.4rem; --br: 6px; --td: none; --weight: 600; --mb: 1rem;">Open Admin Dashboard</a>
 
 <div id="demo"></div>
 
-<h2>Adding a Feed</h2>
+<h2 style="--c: var(--primary); --mt: 2rem; --mb: 0.75rem;">Adding a Feed</h2>
 
 <p>In the admin dashboard, open the <strong>feeds</strong> collection and click <strong>New Record</strong>. Here's what each field means:</p>
 
-<div class="card">
-  <div class="section-label">What to rewrite</div>
+<div style="--bgc: var(--background); --b: 1px solid var(--border); --br: 8px; --p: 1.25rem; --m: 1rem 0;">
+  <div style="--size: 0.75rem; --tt: uppercase; --ls: 0.05em; --c: var(--text-muted); --mb: 0.5rem;">What to rewrite</div>
   <table>
     <tr>
-      <td>source_url</td>
+      <td style="--weight: 600; --ws: nowrap; --w: 30%;">source_url</td>
       <td>
         The RSS feed URL you want to rewrite. This is the original feed from your audio host.<br>
-        <span class="example">e.g. <code>https://anchor.fm/s/9822e708/podcast/rss</code></span>
+        <span style="--c: var(--text-muted); --size: 0.9rem;">e.g. <code>https://anchor.fm/s/9822e708/podcast/rss</code></span>
       </td>
     </tr>
   </table>
 </div>
 
-<div class="card">
-  <div class="section-label">Where to publish</div>
+<div style="--bgc: var(--background); --b: 1px solid var(--border); --br: 8px; --p: 1.25rem; --m: 1rem 0;">
+  <div style="--size: 0.75rem; --tt: uppercase; --ls: 0.05em; --c: var(--text-muted); --mb: 0.5rem;">Where to publish</div>
   <table>
     <tr>
-      <td>slug</td>
+      <td style="--weight: 600; --ws: nowrap; --w: 30%;">slug</td>
       <td>
         A short identifier for your feed &mdash; letters, numbers, and hyphens. This single value determines both where the file is saved and its public URL.<br>
-        <span class="example">e.g. <code>my-show</code></span>
+        <span style="--c: var(--text-muted); --size: 0.9rem;">e.g. <code>my-show</code></span>
       </td>
     </tr>
   </table>
-  <div class="derived">
+  <div style="--bgc: var(--background-alt); --br: 6px; --p: 0.75rem 1rem; --m: 0.5rem 0 1rem; --size: 0.9rem;">
     A slug of <code>my-show</code> produces:<br>
-    <strong>File:</strong> <code>pb_public/v1/my-show.xml</code><br>
-    <strong>URL:</strong> <code>https://yourdomain.com/v1/my-show.xml</code>
+    <strong style="--c: var(--primary);">File:</strong> <code>pb_public/v1/my-show.xml</code><br>
+    <strong style="--c: var(--primary);">URL:</strong> <code>https://yourdomain.com/v1/my-show.xml</code>
   </div>
   <table>
     <tr>
-      <td>domain</td>
+      <td style="--weight: 600; --ws: nowrap; --w: 30%;">domain</td>
       <td>
         Optional. Override the domain used in the feed's public URL. Leave blank to use the default (set via <code>FEEDS_DOMAIN</code> env var or the PocketBase Application URL in admin settings).<br>
-        <span class="example">e.g. <code>https://feed.example.com</code></span>
+        <span style="--c: var(--text-muted); --size: 0.9rem;">e.g. <code>https://feed.example.com</code></span>
       </td>
     </tr>
   </table>
 </div>
 
-<div class="card">
-  <div class="section-label">Your branding</div>
+<div style="--bgc: var(--background); --b: 1px solid var(--border); --br: 8px; --p: 1.25rem; --m: 1rem 0;">
+  <div style="--size: 0.75rem; --tt: uppercase; --ls: 0.05em; --c: var(--text-muted); --mb: 0.5rem;">Your branding</div>
   <table>
     <tr>
-      <td>title</td>
+      <td style="--weight: 600; --ws: nowrap; --w: 30%;">title</td>
       <td>
         Your show's name &mdash; replaces whatever the upstream feed says.<br>
-        <span class="example">e.g. <code>The Startr Podcast</code></span>
+        <span style="--c: var(--text-muted); --size: 0.9rem;">e.g. <code>The Startr Podcast</code></span>
       </td>
     </tr>
     <tr>
-      <td>website</td>
+      <td style="--weight: 600; --ws: nowrap; --w: 30%;">website</td>
       <td>
         Your show's homepage URL.<br>
-        <span class="example">e.g. <code>https://yourdomain.com/podcast</code></span>
+        <span style="--c: var(--text-muted); --size: 0.9rem;">e.g. <code>https://yourdomain.com/podcast</code></span>
       </td>
     </tr>
     <tr>
-      <td>cover_image</td>
+      <td style="--weight: 600; --ws: nowrap; --w: 30%;">cover_image</td>
       <td>
         URL to your cover art. Optional &mdash; leave blank to keep the upstream image.<br>
-        <span class="example">e.g. <code>https://yourdomain.com/podcast/cover.jpg</code></span>
+        <span style="--c: var(--text-muted); --size: 0.9rem;">e.g. <code>https://yourdomain.com/podcast/cover.jpg</code></span>
       </td>
     </tr>
     <tr>
-      <td>author</td>
+      <td style="--weight: 600; --ws: nowrap; --w: 30%;">author</td>
       <td>
         The show author for Apple Podcasts / iTunes. Optional.<br>
-        <span class="example">e.g. <code>Jane Doe</code></span>
+        <span style="--c: var(--text-muted); --size: 0.9rem;">e.g. <code>Jane Doe</code></span>
       </td>
     </tr>
     <tr>
-      <td>owner_email</td>
+      <td style="--weight: 600; --ws: nowrap; --w: 30%;">owner_email</td>
       <td>
         Contact email for Apple Podcasts. Optional.<br>
-        <span class="example">e.g. <code>podcasts@yourdomain.com</code></span>
+        <span style="--c: var(--text-muted); --size: 0.9rem;">e.g. <code>podcasts@yourdomain.com</code></span>
       </td>
     </tr>
   </table>
 </div>
 
-<div class="card">
-  <div class="section-label">Schedule (optional)</div>
+<div style="--bgc: var(--background); --b: 1px solid var(--border); --br: 8px; --p: 1.25rem; --m: 1rem 0;">
+  <div style="--size: 0.75rem; --tt: uppercase; --ls: 0.05em; --c: var(--text-muted); --mb: 0.5rem;">Schedule (optional)</div>
   <table>
     <tr>
-      <td>schedule</td>
+      <td style="--weight: 600; --ws: nowrap; --w: 30%;">schedule</td>
       <td>
         How often to check for upstream changes, as a cron expression. Leave blank for the default (every 15 minutes).<br>
-        <span class="example">
+        <span style="--c: var(--text-muted); --size: 0.9rem;">
           <code>*/15 * * * *</code> &mdash; every 15 min (default)<br>
           <code>*/5 * * * *</code> &mdash; every 5 min<br>
           <code>0 * * * *</code> &mdash; every hour<br>
@@ -168,22 +183,22 @@
 
 <hr>
 
-<h2>Environment Variables (alternative)</h2>
+<h2 style="--c: var(--primary); --mt: 2rem; --mb: 0.75rem;">Environment Variables (alternative)</h2>
 
 <p>For single-feed deploys, you can skip the admin UI and configure via environment variables instead. The server uses these as a fallback when no records exist in the feeds collection.</p>
 
-<div class="card">
+<div style="--bgc: var(--background); --b: 1px solid var(--border); --br: 8px; --p: 1.25rem; --m: 1rem 0;">
   <table>
     <tr><th>Variable</th><th>Description</th></tr>
-    <tr><td>FEEDS_SOURCE_URL</td><td>RSS feed URL to rewrite (required)</td></tr>
-    <tr><td>FEEDS_SLUG</td><td>Feed identifier &mdash; e.g. <code>my-show</code> (required)</td></tr>
-    <tr><td>FEEDS_DOMAIN</td><td>Your domain &mdash; e.g. <code>https://feed.example.com</code></td></tr>
-    <tr><td>FEEDS_TITLE</td><td>Show title (required)</td></tr>
-    <tr><td>FEEDS_WEBSITE</td><td>Show homepage URL (required)</td></tr>
-    <tr><td>FEEDS_COVER_IMAGE</td><td>Cover art URL</td></tr>
-    <tr><td>FEEDS_ITUNES_AUTHOR</td><td>iTunes author</td></tr>
-    <tr><td>FEEDS_ITUNES_OWNER_EMAIL</td><td>iTunes owner email</td></tr>
-    <tr><td>FEEDS_CRON</td><td>Cron schedule (default: <code>*/15 * * * *</code>)</td></tr>
+    <tr><td style="--weight: 600; --ws: nowrap;">FEEDS_SOURCE_URL</td><td>RSS feed URL to rewrite (required)</td></tr>
+    <tr><td style="--weight: 600; --ws: nowrap;">FEEDS_SLUG</td><td>Feed identifier &mdash; e.g. <code>my-show</code> (required)</td></tr>
+    <tr><td style="--weight: 600; --ws: nowrap;">FEEDS_DOMAIN</td><td>Your domain &mdash; e.g. <code>https://feed.example.com</code></td></tr>
+    <tr><td style="--weight: 600; --ws: nowrap;">FEEDS_TITLE</td><td>Show title (required)</td></tr>
+    <tr><td style="--weight: 600; --ws: nowrap;">FEEDS_WEBSITE</td><td>Show homepage URL (required)</td></tr>
+    <tr><td style="--weight: 600; --ws: nowrap;">FEEDS_COVER_IMAGE</td><td>Cover art URL</td></tr>
+    <tr><td style="--weight: 600; --ws: nowrap;">FEEDS_ITUNES_AUTHOR</td><td>iTunes author</td></tr>
+    <tr><td style="--weight: 600; --ws: nowrap;">FEEDS_ITUNES_OWNER_EMAIL</td><td>iTunes owner email</td></tr>
+    <tr><td style="--weight: 600; --ws: nowrap;">FEEDS_CRON</td><td>Cron schedule (default: <code>*/15 * * * *</code>)</td></tr>
   </table>
 </div>
 
@@ -199,7 +214,6 @@
 (function() {
   var demo = document.getElementById('demo');
 
-  // Discover feeds via public endpoint (no auth required)
   fetch('/api/feeds/public')
     .then(function(r) { return r.ok ? r.json() : Promise.reject(); })
     .then(function(data) {
@@ -220,25 +234,25 @@
   function renderDemo(slug) {
     var feedUrl = location.origin + '/v1/' + esc(slug) + '.xml';
     demo.innerHTML =
-      '<h2>Your Feed</h2>' +
+      '<h2 style="--c: var(--primary); --mt: 2rem; --mb: 0.75rem;">Your Feed</h2>' +
       '<startr-player feed="' + feedUrl + '"></startr-player>' +
-      '<div style="margin-top:12px">' +
+      '<div style="--mt: 12px;">' +
       '<startr-subscribe rss="' + feedUrl + '"></startr-subscribe>' +
       '</div>' +
-      '<div style="margin-top:12px;display:flex;align-items:center;gap:8px">' +
-      '<code style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(feedUrl) + '</code>' +
-      '<button onclick="copyFeedUrl(this)" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text-main);cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap">Copy URL</button>' +
+      '<div style="--mt: 12px; --d: flex; --ai: center; --g: 8px;">' +
+      '<code style="--fg: 1; --of: hidden;">' + esc(feedUrl) + '</code>' +
+      '<button onclick="copyFeedUrl(this)">Copy URL</button>' +
       '</div>' +
-      '<p style="margin-top:12px"><a href="/embed">Get embed code</a> to put these widgets on your site.</p>';
+      '<p style="--mt: 12px;"><a href="/embed">Get embed code</a> to put these widgets on your site.</p>';
   }
 
   function renderPlaceholder() {
     demo.innerHTML =
-      '<h2>Widgets</h2>' +
+      '<h2 style="--c: var(--primary); --mt: 2rem; --mb: 0.75rem;">Widgets</h2>' +
       '<p>Add a feed to see these widgets live with your content. ' +
       '<a href="/embed">Embed code generator</a> has copy-paste snippets for your site.</p>' +
       '<startr-player></startr-player>' +
-      '<div style="margin-top:12px">' +
+      '<div style="--mt: 12px;">' +
       '<startr-subscribe apple="#" spotify="#" rss="#"></startr-subscribe>' +
       '</div>';
   }

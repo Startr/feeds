@@ -44,16 +44,16 @@
 
   var STYLE = [
     ':host { display: inline-block; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }',
-    '.badges { display: flex; flex-wrap: wrap; gap: 8px; }',
+    '.badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }',
     'a { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px;',
     '  border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 600;',
-    '  color: #fff; background: var(--startr-accent, #2563eb); transition: opacity 0.15s; }',
+    '  color: #fff; background: var(--startr-accent, hsl(272, 98%, 26%)); transition: opacity 0.15s; }',
     'a:hover { opacity: 0.85; }',
     'a svg { flex-shrink: 0; }',
     '',
     '/* Dark mode */',
     '@media (prefers-color-scheme: dark) {',
-    '  a { background: var(--startr-accent, #60a5fa); }',
+    '  a { background: var(--startr-accent, hsl(272, 70%, 55%)); }',
     '}'
   ].join('\n');
 
