@@ -143,6 +143,47 @@ func TestRewrite_DoesNotRewriteEnclosureURL(t *testing.T) {
 	}
 }
 
+// TestRewrite_GeneratorRewritten verifies that the upstream's <generator>
+// element ("Anchor Podcasts" in the fixture, matching real anchor.fm feeds)
+// is replaced with the value the rewriter is configured with. Generator is
+// informational, not validation-critical, but operators rely on it to trace
+// "where did this XML come from?" when debugging — and a stale upstream
+// generator string in our output is misleading.
+func TestRewrite_GeneratorRewritten(t *testing.T) {
+	input := loadFixture(t)
+	r := New(defaultBranding())
+	r.Generator = "Startr/feeds vTest (https://github.com/Startr/feeds)"
+
+	output, err := r.Rewrite(input)
+	if err != nil {
+		t.Fatalf("rewrite: %v", err)
+	}
+
+	s := string(output)
+
+	// The upstream's generator string MUST NOT appear in the output.
+	if strings.Contains(s, "Anchor Podcasts") {
+		t.Errorf("upstream generator string leaked into output")
+	}
+
+	// Parse the output and assert the new generator is present and exact.
+	doc := etree.NewDocument()
+	if err := doc.ReadFromString(s); err != nil {
+		t.Fatalf("reparse output: %v", err)
+	}
+	channel := doc.FindElement("//channel")
+	if channel == nil {
+		t.Fatalf("output has no <channel>")
+	}
+	gen := channel.SelectElement("generator")
+	if gen == nil {
+		t.Fatalf("output has no <generator>")
+	}
+	if got := gen.Text(); got != r.Generator {
+		t.Errorf("generator text mismatch: got %q, want %q", got, r.Generator)
+	}
+}
+
 // TestRewrite_AtomSelfLinkRewritten covers two cases: an existing atom:self
 // link is rewritten to the new self URL, and a missing atom:self link is
 // injected. Apple Podcasts requires this element — if we drop it, feeds

@@ -91,6 +91,11 @@ Flags:
 		ITunesAuthor:     *itunesAuthr,
 		ITunesOwnerEmail: *itunesOwner,
 	})
+	// Stamp the rewriter binary into the output XML's <generator> element so
+	// the rewritten feed identifies the tool that produced it (replacing
+	// upstream's "Anchor Podcasts" / "Spotify for Podcasters"). The version
+	// var is stamped at build time via -ldflags from the Makefile.
+	rw.Generator = fmt.Sprintf("Startr/feeds %s (https://github.com/Startr/feeds)", version)
 	out := rss.NewRenderer(*output)
 	ch := cache.New(*stateFile)
 

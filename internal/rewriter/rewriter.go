@@ -7,6 +7,7 @@
 //	  <channel><title>
 //	  <channel><link>
 //	  <channel><image> and <channel><image><url>
+//	  <channel><generator>              (set to Rewriter.Generator if non-empty)
 //	  <atom:link rel="self">            (injected if missing)
 //	  <itunes:author>
 //	  <itunes:owner><itunes:name>       (if branding.ITunesAuthor set)
@@ -42,11 +43,20 @@ const (
 )
 
 // Rewriter holds branding config and rewrites XML bytes in place.
+//
+// Generator is the value written into <channel><generator>, replacing
+// whatever the upstream had ("Anchor Podcasts", "Spotify for Podcasters",
+// etc.). Empty means "leave the upstream value alone" — same convention as
+// the Branding fields. The cmd/feeds layer sets this to a string that
+// includes the binary version stamped at build time, so the output XML
+// always identifies which Startr/feeds build produced it.
 type Rewriter struct {
-	Branding Branding
+	Branding  Branding
+	Generator string
 }
 
-// New returns a rewriter configured with the given branding.
+// New returns a rewriter configured with the given branding. Generator can
+// be set on the returned struct after construction.
 func New(b Branding) *Rewriter {
 	return &Rewriter{Branding: b}
 }
@@ -131,6 +141,16 @@ func (r *Rewriter) Rewrite(input []byte) ([]byte, error) {
 			itunesImg = channel.CreateElement("itunes:image")
 		}
 		itunesImg.CreateAttr("href", r.Branding.Image)
+	}
+
+	// --- generator -----------------------------------------------------------
+	// Replace the upstream's <generator> ("Anchor Podcasts", "Spotify for
+	// Podcasters", etc.) with our own attribution. Informational only — does
+	// not affect feed validation — but it's a useful breadcrumb when an
+	// operator is debugging "where did this XML come from?" and a small bit
+	// of self-attribution for the rewriter.
+	if r.Generator != "" {
+		setChildText(channel, "generator", r.Generator)
 	}
 
 	// --- items are LEFT ALONE ----------------------------------------------
