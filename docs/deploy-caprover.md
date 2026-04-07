@@ -2,7 +2,7 @@
 title: "Deploying Startr/feeds to CapRover"
 audience: operators
 status: stable
-applies_to: v0.0.x (PocketBase standalone + JS hooks)
+applies_to: v0.0.x+ (PocketBase standalone + JS hooks)
 last_updated: 2026-04-09
 ---
 

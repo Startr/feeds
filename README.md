@@ -1,6 +1,6 @@
 # Startr/feeds
 
-## v0.0.5
+## v0.1.0
 
 Self-hosted feed rewriter. Fetch an RSS/Atom feed from upstream, rewrite the branding and channel metadata to point at your own URL, republish through your own infrastructure. Your subscribers bind to your URL, forever.
 
@@ -16,11 +16,15 @@ Startr/feeds is the feed proxy / rewriter we wished existed:
 - **Rent the audio host.** `<enclosure url>` elements are left untouched. Spotify or Anchor host the audio bytes for free. If you want to move to Archive.org, S3, or your own static host later, swap it with a config change and nobody notices.
 - **No lock-in, anywhere.** AGPL-3.0. Single container. Self-hostable on anything that runs Docker, including a Raspberry Pi. If you want to run this on a box in your closet, nothing stops you.
 
-## Current scope (v0.0.x)
+## Current scope (v0.1.x)
 
 - **PocketBase standalone** — pre-built binary (renamed to `feeds` for branding). HTTP static file serving, admin UI at `/_/`, built-in cron scheduler, SQLite, graceful shutdown. One container does everything.
-- **JS hook rewrite pipeline** (`pb_hooks/feeds.pb.js`) — the entire rewrite logic runs inside PocketBase's goja runtime. Zero Go compilation, build time in seconds.
+- **JS hook rewrite pipeline** (`pb_hooks/feeds.pb.js` + `pb_hooks/lib/pipeline.js`) — the entire rewrite logic runs inside PocketBase's goja runtime. Zero Go compilation, build time in seconds.
 - **Multi-feed from day one** — feed configs stored in PocketBase's "feeds" collection, managed via the admin UI at `/_/`. Single-feed deploys can use `FEEDS_*` env vars instead.
+- **Embeddable widgets** — `<startr-player>` and `<startr-subscribe>` web components. Drop a `<script>` tag on any site. Episode picker, playback speed control (1x/1.25x/1.5x/2x), progress memory (localStorage), keyboard shortcuts, share button, dark mode via `@media (prefers-color-scheme: dark)`, loading skeleton.
+- **Embed code generator** at `/embed` — pick a feed, copy the snippet, paste on your site.
+- **[startr.style](https://startr.style) integration** — landing page and embed page use the Startr design system with inline style attribute utilities, theme toggle (light/dark), and `--primary` purple accent.
+- **CORS feed serving** — widgets can fetch feed XML cross-origin via a custom route with `Access-Control-Allow-Origin: *`.
 - XML parsing via [xml-js](https://github.com/nicknisi/xml-js) (vendored UMD bundle) — non-compact mode preserves iTunes namespace, podcast 2.0 namespace, and any unknown tags on round-trip
 - `<channel><generator>` rewritten to identify Startr/feeds + version (replaces upstream "Anchor Podcasts" / "Spotify for Podcasters")
 - HTTP conditional GET with `If-None-Match` / `If-Modified-Since` (98% of scheduled runs short-circuit on HTTP 304)
@@ -47,7 +51,7 @@ docker run --rm -p 8090:8090 \
 
 Feed is served at `http://localhost:8090/v1/your-show.xml`. Admin UI at `http://localhost:8090/_/`.
 
-Pin to a specific release with `ghcr.io/Startr/feeds:0.0.4` (or any tag from the [Releases](https://github.com/Startr/feeds/releases) page).
+Pin to a specific release tag from the [Releases](https://github.com/Startr/feeds/releases) page.
 
 ### From source with `make`
 
@@ -142,7 +146,7 @@ Save and restart. `feeds serve`:
 | `<item><guid>`, `<item><title>`, `<item><description>`, `<item><pubDate>` | Left alone. Episode-level content. |
 | Any unknown namespaced element | Left alone. Round-tripped via xml-js non-compact mode. |
 
-Enclosure URLs staying untouched is how v0.1.0 runs at zero cost: Spotify hosts the audio bytes for free. If you want to rehost audio yourself, that's a v1.0+ feature via an opt-in rehosting config.
+Enclosure URLs staying untouched is how Startr/feeds runs at zero cost: Spotify hosts the audio bytes for free. If you want to rehost audio yourself, that's a v1.0+ feature via an opt-in rehosting config.
 
 ## Build, release, and deploy
 
@@ -243,6 +247,6 @@ The names `Startr/feeds`, `Startr`, `startrcast`, `startr-player`, and `startr-s
 
 ## Docs
 
-Per-release notes live in [CHANGELOG.md](./CHANGELOG.md).
+Per-release notes live in [CHANGELOG.md](./CHANGELOG.md). Deferred work is tracked in [TODOS.md](./TODOS.md).
 
 Design thinking and editorial context for the canonical `startr.media` instance live in [`docs/`](./docs/). These documents explain why the tool exists, what problem it solves, and how it fits into the broader Sage ecosystem. They are useful context for anyone evaluating whether to adopt Startr/feeds.

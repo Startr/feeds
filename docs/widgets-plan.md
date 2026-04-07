@@ -46,7 +46,7 @@ fits in one container. The user feels: "I can't believe this is free and I own i
 
 1. **`<startr-player>`** -- vanilla web component, shadow DOM, reads RSS feed URL
 2. **`<startr-subscribe>`** -- vanilla web component, configurable platform links
-3. **Build/bundle step** producing `pb_public/widgets/player.js` and `pb_public/widgets/subscribe.js`
+3. ~~Build/bundle step~~ Zero build step. Source files in `pb_public/widgets/` ARE the production files.
 4. **Record first episode**, upload to Spotify for Podcasters
 5. **Verify rewriter** picks it up, submit feed to Apple Podcasts and Spotify
 
@@ -66,16 +66,21 @@ fits in one container. The user feels: "I can't believe this is free and I own i
 
 | # | Feature | Effort | Why deferred |
 |---|---------|--------|--------------|
-| 1 | Dark mode auto-detection | S | Ship light-only first, add prefers-color-scheme later |
-| 2 | Playback speed control | S | Ship basic player first, speed toggle later |
 | 10 | Mini mode layout variant | S | Card mode sufficient for v0.1.x, add mode="mini" later |
+
+### Completed (originally deferred, shipped in v0.1.0 polish)
+
+| # | Feature | Status |
+|---|---------|--------|
+| 1 | Dark mode auto-detection | Shipped. `@media (prefers-color-scheme: dark)` in both widgets. |
+| 2 | Playback speed control | Shipped. 1x/1.25x/1.5x/2x cycle in player footer. |
 
 ## Scope Decisions
 
 | # | Proposal | Effort | Decision | Reasoning |
 |---|----------|--------|----------|-----------|
-| 1 | Dark mode auto-detection | S | DEFERRED | User prefers to ship light-only first |
-| 2 | Playback speed control | S | DEFERRED | Ship basic player first, speed later |
+| 1 | Dark mode auto-detection | S | SHIPPED | Implemented in v0.1.0 polish pass |
+| 2 | Playback speed control | S | SHIPPED | Implemented in v0.1.0 polish pass |
 | 3 | Episode picker in player | S-M | ACCEPTED | Turns player from single-play to mini podcast app |
 | 4 | Customizable accent color | S | ACCEPTED | CSS custom property, zero cost, any-brand match |
 | 5 | RSS auto-discovery meta tag | S | ACCEPTED | One line, unlocks feed discovery |

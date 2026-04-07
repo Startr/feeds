@@ -8,26 +8,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **PocketBase standalone + JS hooks.** The entire rewrite pipeline now runs as a PocketBase JS hook (`pb_hooks/feeds.pb.js`). The container downloads a pre-built PocketBase binary (renamed to `feeds` for branding) — no Go compiler, no compilation, build time in seconds. PocketBase provides: HTTP server, static file serving (`pb_public/`), admin UI at `/_/`, cron scheduler, SQLite, and graceful shutdown.
+- **PocketBase standalone + JS hooks.** The entire rewrite pipeline now runs as a PocketBase JS hook (`pb_hooks/feeds.pb.js` + `pb_hooks/lib/pipeline.js`). The container downloads a pre-built PocketBase binary (renamed to `feeds` for branding), no Go compiler, no compilation, build time in seconds. PocketBase provides: HTTP server, static file serving (`pb_public/`), admin UI at `/_/`, cron scheduler, SQLite, and graceful shutdown.
 - **Multi-feed from day one.** Feed configs are stored in a PocketBase "feeds" collection, managed via the admin UI at `/_/`. Each record is one feed to rewrite. Single-feed deploys can still use `FEEDS_*` env vars as a fallback.
-- `pb_hooks/feeds.pb.js` — the rewrite pipeline as a PocketBase JS hook. Fetches upstream RSS with conditional GET, rewrites channel-level branding via xml-js DOM manipulation, writes rewritten XML to `pb_public/`, stores cache state (ETag, Last-Modified) back to the collection record.
-- `pb_hooks/lib/xml-js.js` — vendored UMD bundle of [xml-js](https://github.com/nicknisi/xml-js) v1.6.11 for XML ↔ JS object conversion. Vendored via `npm pack` (see `pb_hooks/lib/LIBRARIES.md`).
-- `pb_migrations/1744156800_create_feeds.js` — creates the "feeds" collection schema on first boot.
-- `CHANGELOG.md` (this file).
+- **Embeddable `<startr-player>` widget.** Drop a `<script>` tag on any site to get a podcast player with episode picker, playback speed control (1x/1.25x/1.5x/2x), progress memory via localStorage, keyboard shortcuts (space/arrows), share button (Web Share API + clipboard fallback), and loading skeleton animation.
+- **Embeddable `<startr-subscribe>` widget.** Shows "Listen on" badges for Apple Podcasts, Spotify, and RSS. Only platforms with a URL render.
+- **Dark mode for widgets.** Both widgets detect `prefers-color-scheme: dark` via `@media` query inside shadow DOM and switch to a dark palette matching startr.style colors.
+- **Embed code generator** at `/embed`. Pick a feed, configure platform links, copy the embed snippet.
+- **startr.style integration.** Landing page and embed page use the [Startr design system](https://startr.style) with inline style attribute utilities (no CSS classes, no custom stylesheets). Purple `--primary` accent, Nunito Sans font, full dark mode support.
+- **Theme toggle.** Sun/moon button on both pages, matching the startr.style pattern. localStorage persistence with 24-hour expiry, falls back to system `prefers-color-scheme`.
+- **CORS feed serving.** Custom route at `/v1/{slug}` serves feed XML with `Access-Control-Allow-Origin: *`, enabling cross-origin widget embeds.
+- **Social meta tags.** Open Graph and Twitter Card tags on the landing page.
+- **Copy feed URL button** on landing page and embed page for easy feed URL sharing.
 - `FEEDS_CRON` env var for configuring the rewrite schedule using standard cron expressions (default `*/15 * * * *`). Replaces `FEEDS_INTERVAL`.
 - `FEEDS_VERSION` env var for stamping the `<generator>` tag (default `dev`).
 - `feeds superuser` command (from PocketBase) for creating/updating admin accounts for the dashboard.
 - `docs/deploy-caprover.md` — operator walkthrough for CapRover deployment.
 
+#### For contributors
+- `pb_hooks/feeds.pb.js` — route/cron/bootstrap hooks. `pb_hooks/lib/pipeline.js` — rewrite pipeline module (xml-js DOM manipulation, HTTP conditional GET, cache state).
+- `pb_hooks/lib/xml-js.js` — vendored UMD bundle of [xml-js](https://github.com/nicknisi/xml-js) v1.6.11. Vendored via `npm pack` (see `pb_hooks/lib/LIBRARIES.md`).
+- `pb_migrations/1744156800_create_feeds.js` — creates the "feeds" collection schema on first boot.
+- `TODOS.md` for tracking deferred work.
+
 ### Changed
-- **Architecture: Go binary → PB standalone + JS hooks.** The Dockerfile no longer compiles Go code. It downloads the pre-built PocketBase binary and copies in `pb_hooks/`, `pb_migrations/`, and `pb_public/`. The Go pipeline code in `internal/` is kept as a reference implementation and high-performance fallback for large-scale multi-feed deployments.
+- **Architecture: Go binary → PB standalone + JS hooks.** The Dockerfile no longer compiles Go code. It downloads the pre-built PocketBase binary and copies in `pb_hooks/`, `pb_migrations/`, and `pb_public/`.
+- **Go pipeline removed.** The entire `internal/` directory and `cmd/feeds/rewrite.go` have been deleted. The `feeds rewrite` CLI subcommand no longer exists. Feed rewriting is handled entirely by PB JS hooks. For scheduled rewrites outside PB, use the `/debug/run` endpoint (superuser auth required).
+- **`/debug/run` route now requires superuser auth** via `e.hasSuperuserAuth()`. Previously unauthenticated.
 - **Scheduler:** `time.Ticker` → PocketBase's built-in cron via `cronAdd()` in the JS hook.
 - **Static file serving:** PocketBase serves `pb_public/` over HTTP. The JS hook writes output XML there. No external web server needed.
-- **Env var scope:** Feed-specific config uses `FEEDS_*` env vars (UPSTREAM, OUTPUT, SELF_URL, CHANNEL_*, ITUNES_*, CRON). PocketBase infrastructure flags (`--http`, `--dir`, `--publicDir`) come from the CLI / Dockerfile CMD — no env var duplication.
+- **Env var scope:** Feed-specific config uses `FEEDS_*` env vars (UPSTREAM, OUTPUT, SELF_URL, CHANNEL_*, ITUNES_*, CRON). PocketBase infrastructure flags (`--http`, `--dir`, `--publicDir`) come from the CLI / Dockerfile CMD, no env var duplication.
 - `FEEDS_INTERVAL` removed (replaced by `FEEDS_CRON`). `FEEDS_HTTP`, `FEEDS_DIR`, `FEEDS_PUBLIC_DIR`, `FEEDS_HOOKS_DIR`, `FEEDS_MIGRATIONS_DIR` removed (PocketBase handles these via its own flags).
 - Dockerfile rewritten: single-stage Alpine, downloads PocketBase binary, copies hooks/migrations/public. No Go build stage.
 - Makefile updated: removed `--build-arg VERSION=` from build targets (no Go compilation), updated `it_run_dev` for PB standalone.
-- README updated to reflect PB standalone + JS hooks architecture, multi-feed support, simplified install.
+- README updated to reflect v0.1.0 scope including widgets, startr.style, and Go pipeline removal.
+- Generated feed XML (`pb_public/v1/*.xml`) added to `.gitignore` as runtime output.
+
+### Fixed
+- XSS in `index.html` `renderDemo()`: slug is now escaped before innerHTML assignment.
+- Audio event listener accumulation in player widget: events are now bound once on first Audio creation, not re-added on every episode switch.
+- `Array.find()` usage in `pipeline.js` replaced with ES5-compatible `for` loop for PocketBase's goja runtime.
+- `color-mix()` CSS in embed page replaced with `var(--code-bg)` for Safari < 16.4 compatibility.
+- Silent error swallowing in public feed list route now logs to console.
+- `navigator.clipboard` guard added to embed page copy functions.
+- Cron callback now has try/catch error handling matching bootstrap pattern.
 
 ## [0.0.4] - 2026-04-07
 
