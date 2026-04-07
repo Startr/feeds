@@ -30,26 +30,33 @@ import (
 func cmdServe(args []string) error {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 
+	// Env vars are read as defaults so containerized deploys (CapRover,
+	// fly.io, k8s) can configure feeds without baking values into the CMD.
+	// CLI flags still override env vars when explicitly passed. The env var
+	// namespace is shared with `feeds rewrite` so a single CapRover env
+	// config drives whichever subcommand the container runs. See the
+	// README's "Environment variables" section for the full table.
 	var (
-		httpAddr   = fs.String("http", "0.0.0.0:8090", "HTTP bind address (reserved for v0.2 PocketBase admin; unused in v0.1.0)")
-		dataDir    = fs.String("dir", "/app/pb_data", "data directory — state file lives here")
-		interval   = fs.Duration("interval", 15*time.Minute, "how often to re-run the rewrite pipeline")
-		upstream   = fs.String("upstream", "", "upstream feed URL (required in v0.1.0 until PB collections land)")
-		output     = fs.String("output", "", "output XML path (required)")
-		selfURL    = fs.String("self-url", "", "public URL subscribers bind to (required)")
-		title      = fs.String("channel-title", "", "channel title to inject")
-		link       = fs.String("channel-link", "", "channel link to inject")
-		image      = fs.String("channel-image", "", "channel image URL (optional)")
-		itunesAuth = fs.String("itunes-author", "", "iTunes author (optional)")
-		itunesOwnr = fs.String("itunes-owner-email", "", "iTunes owner email (optional)")
+		httpAddr   = fs.String("http", envString("FEEDS_HTTP", "0.0.0.0:8090"), "HTTP bind address (env: FEEDS_HTTP; reserved for v0.2 PocketBase admin; unused in v0.1.0)")
+		dataDir    = fs.String("dir", envString("FEEDS_DIR", "/app/pb_data"), "data directory — state file lives here (env: FEEDS_DIR)")
+		interval   = fs.Duration("interval", envDuration("FEEDS_INTERVAL", 15*time.Minute), "how often to re-run the rewrite pipeline (env: FEEDS_INTERVAL)")
+		upstream   = fs.String("upstream", envString("FEEDS_UPSTREAM", ""), "upstream feed URL (env: FEEDS_UPSTREAM; required in v0.1.0 until PB collections land)")
+		output     = fs.String("output", envString("FEEDS_OUTPUT", ""), "output XML path (env: FEEDS_OUTPUT, required)")
+		selfURL    = fs.String("self-url", envString("FEEDS_SELF_URL", ""), "public URL subscribers bind to (env: FEEDS_SELF_URL, required)")
+		title      = fs.String("channel-title", envString("FEEDS_CHANNEL_TITLE", ""), "channel title to inject (env: FEEDS_CHANNEL_TITLE)")
+		link       = fs.String("channel-link", envString("FEEDS_CHANNEL_LINK", ""), "channel link to inject (env: FEEDS_CHANNEL_LINK)")
+		image      = fs.String("channel-image", envString("FEEDS_CHANNEL_IMAGE", ""), "channel image URL (env: FEEDS_CHANNEL_IMAGE, optional)")
+		itunesAuth = fs.String("itunes-author", envString("FEEDS_ITUNES_AUTHOR", ""), "iTunes author (env: FEEDS_ITUNES_AUTHOR, optional)")
+		itunesOwnr = fs.String("itunes-owner-email", envString("FEEDS_ITUNES_OWNER_EMAIL", ""), "iTunes owner email (env: FEEDS_ITUNES_OWNER_EMAIL, optional)")
 	)
 
 	// Register flags we parse for forward-compat with v0.2 PocketBase but
 	// don't read in v0.1.0. Statement form (discarding return value) keeps
-	// the unused-var checker happy.
-	fs.String("hooks-dir", "/app/pb_hooks", "reserved for v0.2 PocketBase hooks")
-	fs.String("migrations-dir", "/app/pb_migrations", "reserved for v0.2 PocketBase migrations")
-	fs.String("public-dir", "/app/pb_public", "reserved for v0.2 PocketBase public assets")
+	// the unused-var checker happy. Env vars still bind so CapRover can
+	// pre-set them today and they'll Just Work when v0.2 ships.
+	fs.String("hooks-dir", envString("FEEDS_HOOKS_DIR", "/app/pb_hooks"), "reserved for v0.2 PocketBase hooks (env: FEEDS_HOOKS_DIR)")
+	fs.String("migrations-dir", envString("FEEDS_MIGRATIONS_DIR", "/app/pb_migrations"), "reserved for v0.2 PocketBase migrations (env: FEEDS_MIGRATIONS_DIR)")
+	fs.String("public-dir", envString("FEEDS_PUBLIC_DIR", "/app/pb_public"), "reserved for v0.2 PocketBase public assets (env: FEEDS_PUBLIC_DIR)")
 
 	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, `feeds serve — long-running ticker (v0.2 swaps this for PocketBase)

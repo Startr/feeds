@@ -98,7 +98,66 @@ See [`examples/`](./examples/) for ready-to-copy configs:
 
 ## Configuration
 
-v0.1.0 is flag-driven. YAML config file support lands in v0.1.1:
+v0.0.x is flag-driven. Every flag also reads from an environment variable so containerized deploys (CapRover, fly.io, k8s) can configure the binary without baking values into the CMD line. CLI flags still override env vars when explicitly passed (precedence: CLI flag > env var > literal default).
+
+### Environment variables
+
+The same env var namespace applies to both `feeds rewrite` and `feeds serve`, so a single deploy config drives whichever subcommand the container runs.
+
+| Env var | Flag | Notes |
+|---|---|---|
+| `FEEDS_SOURCE` | `--source` | `spotify` (default; v0.0.x ships spotify only) |
+| `FEEDS_UPSTREAM` | `--upstream` | upstream feed URL — **required** |
+| `FEEDS_OUTPUT` | `--output` | output XML path — **required** |
+| `FEEDS_SELF_URL` | `--self-url` | public URL subscribers bind to — **required** |
+| `FEEDS_CHANNEL_TITLE` | `--channel-title` | **required** |
+| `FEEDS_CHANNEL_LINK` | `--channel-link` | **required** |
+| `FEEDS_CHANNEL_IMAGE` | `--channel-image` | optional |
+| `FEEDS_ITUNES_AUTHOR` | `--itunes-author` | optional |
+| `FEEDS_ITUNES_OWNER_EMAIL` | `--itunes-owner-email` | optional |
+| `FEEDS_STATE` | `--state` | cache state file path (rewrite only; default `.feeds-state.json`) |
+| `FEEDS_INTERVAL` | `--interval` | tick interval for `feeds serve`, e.g. `15m`, `30s`, `2h` (default `15m`) |
+| `FEEDS_DIR` | `--dir` | data directory for `feeds serve` (default `/app/pb_data`) |
+| `FEEDS_HTTP` | `--http` | HTTP bind for `feeds serve` (reserved for v0.2; unused in v0.0.x) |
+| `FEEDS_HOOKS_DIR` | `--hooks-dir` | reserved for v0.2 PocketBase |
+| `FEEDS_MIGRATIONS_DIR` | `--migrations-dir` | reserved for v0.2 PocketBase |
+| `FEEDS_PUBLIC_DIR` | `--public-dir` | reserved for v0.2 PocketBase |
+| `FEEDS_CONFIG` | `--config` | reserved for v0.1.1+ YAML config |
+
+Bad `FEEDS_INTERVAL` values (unparseable by Go's `time.ParseDuration`) silently fall back to the default — env var typos shouldn't crash the container at startup.
+
+### CapRover deploy
+
+The repo ships a [`captain-definition`](./captain-definition) at the root that pulls `ghcr.io/startr/feeds:latest`, layers in `pb_hooks/`, `pb_migrations/`, and `pb_public/` (forward-compat with v0.2 PocketBase + room for forks to ship custom assets), and runs `feeds serve` as the container CMD. No flags are baked in — env vars do all the configuration, so you can change a value in the CapRover dashboard without rebuilding.
+
+> **First time deploying?** Read [`docs/deploy-caprover.md`](./docs/deploy-caprover.md) first. It walks through the **one-time** dashboard setup — creating the app, attaching a persistent volume, configuring nginx to serve the static XML off the volume, and mapping your `feed.yourdomain.com` subdomain — that has to happen *before* `caprover deploy --default` produces a working feed. The walkthrough covers verification with `curl`, validation against Apple Podcasts' parser, and common gotchas (404, 502, stale 304 cache, rollback). The summary below assumes that one-time setup is already done.
+
+CapRover one-click installs and `captain-definition`-built apps both expose env vars in the dashboard's **App Configs → Environment Variables** tab. Set the `FEEDS_*` vars there:
+
+```
+FEEDS_UPSTREAM=https://anchor.fm/s/YOUR_SHOW_ID/podcast/rss
+FEEDS_OUTPUT=/app/pb_data/public/your-show.xml
+FEEDS_SELF_URL=https://feed.yourdomain.com/v1/your-show.xml
+FEEDS_CHANNEL_TITLE=Your Show
+FEEDS_CHANNEL_LINK=https://yourdomain.com/podcast
+FEEDS_CHANNEL_IMAGE=https://yourdomain.com/podcast/cover.jpg
+FEEDS_ITUNES_AUTHOR=Your Name
+FEEDS_ITUNES_OWNER_EMAIL=you@yourdomain.com
+FEEDS_INTERVAL=15m
+```
+
+Save and restart the app. `feeds serve` does the rewrite + ticker in one shot:
+
+1. Logs `feeds serve <version>: ticker mode, interval=15m, ...` on startup.
+2. **Runs the rewrite pipeline once immediately**, so subscribers get a fresh feed at deploy time — no waiting for the first tick.
+3. Re-runs the pipeline on every `FEEDS_INTERVAL` tick. 98% of polls short-circuit on HTTP 304 (`If-None-Match` / `If-Modified-Since`), so steady-state cost is ~one HTTP request per tick and zero disk I/O.
+4. On SIGTERM (CapRover stop / restart), shuts down cleanly.
+
+Point your subscriber URL (e.g., `feed.yourdomain.com/v1/your-show.xml`) at the CapRover app's persistent volume served by the built-in nginx — typically `/app/pb_data/public/your-show.xml` mapped to `/v1/your-show.xml` via a CapRover **HTTP Settings → nginx config** rewrite, or via a sidecar static server.
+
+### YAML config (v0.1.1+)
+
+YAML config file support lands in v0.1.1:
 
 ```yaml
 # feeds.yaml (v0.1.1+)

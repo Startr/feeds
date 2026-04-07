@@ -13,6 +13,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 )
 
 // version is stamped at build time via -ldflags. Defaults to "dev" for
@@ -48,6 +49,35 @@ func main() {
 		usage()
 		os.Exit(2)
 	}
+}
+
+// envString returns the value of env var key if non-empty, otherwise
+// fallback. Lets stdlib flag.String calls accept env-var-as-default in one
+// line:
+//
+//	upstream := fs.String("upstream", envString("FEEDS_UPSTREAM", ""), "...")
+//
+// The flag, if explicitly set on the command line, still overrides the env
+// var (because Parse runs after we read it). This is the expected
+// precedence: CLI flag > env var > literal default.
+func envString(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
+// envDuration is the time.Duration variant of envString. Bad values fall
+// back silently to the literal default — env-var typos shouldn't crash the
+// container at startup. The README documents that values must be parseable
+// by Go's time.ParseDuration ("15m", "30s", "2h", etc.).
+func envDuration(key string, fallback time.Duration) time.Duration {
+	if v := os.Getenv(key); v != "" {
+		if parsed, err := time.ParseDuration(v); err == nil {
+			return parsed
+		}
+	}
+	return fallback
 }
 
 // usage prints the top-level banner and subcommand list. The ASCII art is

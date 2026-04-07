@@ -20,18 +20,22 @@ import (
 func cmdRewrite(args []string) error {
 	fs := flag.NewFlagSet("rewrite", flag.ContinueOnError)
 
+	// Env vars are read as defaults so containerized deploys (CapRover,
+	// fly.io, k8s) can configure feeds without baking values into the CMD.
+	// CLI flags still override env vars when explicitly passed. See the
+	// README's "Environment variables" section for the full table.
 	var (
-		sourceName  = fs.String("source", "spotify", "source adapter (v0.1.0: spotify only)")
-		upstream    = fs.String("upstream", "", "upstream feed URL (required)")
-		output      = fs.String("output", "", "output XML path (required)")
-		selfURL     = fs.String("self-url", "", "public URL subscribers bind to (required)")
-		title       = fs.String("channel-title", "", "channel title to inject")
-		link        = fs.String("channel-link", "", "channel link to inject")
-		image       = fs.String("channel-image", "", "channel image URL (optional)")
-		itunesAuthr = fs.String("itunes-author", "", "iTunes author (optional)")
-		itunesOwner = fs.String("itunes-owner-email", "", "iTunes owner email (optional)")
-		stateFile   = fs.String("state", ".feeds-state.json", "path to cache state file for conditional GET")
-		configPath  = fs.String("config", "", "YAML config file (v0.1.1+, not yet supported)")
+		sourceName  = fs.String("source", envString("FEEDS_SOURCE", "spotify"), "source adapter (env: FEEDS_SOURCE; v0.1.0: spotify only)")
+		upstream    = fs.String("upstream", envString("FEEDS_UPSTREAM", ""), "upstream feed URL (env: FEEDS_UPSTREAM, required)")
+		output      = fs.String("output", envString("FEEDS_OUTPUT", ""), "output XML path (env: FEEDS_OUTPUT, required)")
+		selfURL     = fs.String("self-url", envString("FEEDS_SELF_URL", ""), "public URL subscribers bind to (env: FEEDS_SELF_URL, required)")
+		title       = fs.String("channel-title", envString("FEEDS_CHANNEL_TITLE", ""), "channel title to inject (env: FEEDS_CHANNEL_TITLE, required)")
+		link        = fs.String("channel-link", envString("FEEDS_CHANNEL_LINK", ""), "channel link to inject (env: FEEDS_CHANNEL_LINK, required)")
+		image       = fs.String("channel-image", envString("FEEDS_CHANNEL_IMAGE", ""), "channel image URL (env: FEEDS_CHANNEL_IMAGE, optional)")
+		itunesAuthr = fs.String("itunes-author", envString("FEEDS_ITUNES_AUTHOR", ""), "iTunes author (env: FEEDS_ITUNES_AUTHOR, optional)")
+		itunesOwner = fs.String("itunes-owner-email", envString("FEEDS_ITUNES_OWNER_EMAIL", ""), "iTunes owner email (env: FEEDS_ITUNES_OWNER_EMAIL, optional)")
+		stateFile   = fs.String("state", envString("FEEDS_STATE", ".feeds-state.json"), "path to cache state file for conditional GET (env: FEEDS_STATE)")
+		configPath  = fs.String("config", envString("FEEDS_CONFIG", ""), "YAML config file (env: FEEDS_CONFIG; v0.1.1+, not yet supported)")
 	)
 
 	fs.Usage = func() {
