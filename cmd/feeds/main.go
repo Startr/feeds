@@ -50,8 +50,19 @@ func main() {
 	}
 }
 
+// usage prints the top-level banner and subcommand list. The ASCII art is
+// shown only on the top-level --help screen — subcommand --help (rewrite,
+// serve) deliberately stays clean so its output is grep-friendly for
+// scripting and CI logs. Box-drawing characters render in any UTF-8 capable
+// terminal (iTerm2, GNOME Terminal, Windows Terminal, vscode, Docker logs).
 func usage() {
-	fmt.Fprintf(os.Stderr, `feeds %s — self-hosted feed rewriter
+	fmt.Fprintf(os.Stderr, `
+   (((•)))   ┌─┐┌─┐┌─┐┌┬┐┌─┐
+             ├┤ ├┤ ├┤  ││└─┐
+             └  └─┘└─┘─┴┘└─┘
+
+  Startr/feeds %s — self-hosted feed rewriter
+  Own the subscriber URL. Rent the audio host.
 
 Usage:
   feeds <subcommand> [flags]

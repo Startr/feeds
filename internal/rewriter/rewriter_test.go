@@ -61,17 +61,40 @@ func TestRewrite_PreservesITunesNamespace(t *testing.T) {
 		}
 	}
 
-	// Unknown namespaced element MUST survive.
-	if !strings.Contains(s, "<podcast:guid>abc123-def456-7890</podcast:guid>") {
-		t.Errorf("podcast:guid element was not preserved")
+	// Parse the output and assert elements exist structurally. String
+	// matching on serialization is brittle — etree may or may not produce
+	// self-closing tags for empty elements depending on version.
+	doc := etree.NewDocument()
+	if err := doc.ReadFromString(s); err != nil {
+		t.Fatalf("reparse output: %v", err)
 	}
-	if !strings.Contains(s, `<podcast:locked owner="original@example.com">no</podcast:locked>`) {
-		t.Errorf("podcast:locked element was not preserved")
+	channel := doc.FindElement("//channel")
+	if channel == nil {
+		t.Fatalf("output has no <channel>")
+	}
+
+	// Unknown namespaced element MUST survive with text content intact.
+	if guid := channel.SelectElement("podcast:guid"); guid == nil {
+		t.Errorf("podcast:guid element was dropped on round-trip")
+	} else if guid.Text() != "abc123-def456-7890" {
+		t.Errorf("podcast:guid text changed: got %q", guid.Text())
+	}
+	if locked := channel.SelectElement("podcast:locked"); locked == nil {
+		t.Errorf("podcast:locked element was dropped on round-trip")
+	} else {
+		if owner := locked.SelectAttrValue("owner", ""); owner != "original@example.com" {
+			t.Errorf("podcast:locked owner attribute changed: got %q", owner)
+		}
+		if locked.Text() != "no" {
+			t.Errorf("podcast:locked text changed: got %q", locked.Text())
+		}
 	}
 
 	// iTunes category MUST survive (Apple Podcasts requires it).
-	if !strings.Contains(s, `<itunes:category text="Technology"/>`) {
-		t.Errorf("itunes:category was not preserved verbatim")
+	if cat := channel.SelectElement("itunes:category"); cat == nil {
+		t.Errorf("itunes:category was dropped on round-trip")
+	} else if text := cat.SelectAttrValue("text", ""); text != "Technology" {
+		t.Errorf("itunes:category text attribute changed: got %q", text)
 	}
 }
 

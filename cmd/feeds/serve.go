@@ -69,9 +69,24 @@ Flags:
 	}
 
 	// The --http flag is parsed for forward-compat with v0.2 PocketBase but
-	// not used in v0.1.0. Log it so operators know it's ignored.
-	log.Printf("feeds serve v0.1.0: ticker mode, interval=%s, http=%s (ignored until v0.2)", *interval, *httpAddr)
+	// not used in v0.1.0. Log it so operators know it's ignored. The version
+	// string comes from the package-level `version` var, stamped at build
+	// time via -ldflags from the Makefile's RELEASE_VERSION cascade.
+	log.Printf("feeds serve %s: ticker mode, interval=%s, http=%s (ignored until v0.2)", version, *interval, *httpAddr)
 
+	// Set up signal handling first — both the configured (ticker) and idle
+	// (no-config) paths need it.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// Validate the flags v0.1.0 needs to actually do work. If any are
+	// missing, fail-soft: log the situation and idle on the signal context
+	// instead of erroring out. This matches the v0.2 vision where PocketBase
+	// collections will be the source of feed config and starting up with no
+	// flags is normal — the server comes up empty and waits for an admin to
+	// add a feed. For v0.1.0 it keeps `make it_run` (no flags passed) and
+	// CapRover deploys-without-config working as smoke tests of the binary
+	// itself, instead of crashing the container loop on first boot.
 	missing := []string{}
 	if *upstream == "" {
 		missing = append(missing, "--upstream")
@@ -89,8 +104,10 @@ Flags:
 		missing = append(missing, "--channel-link")
 	}
 	if len(missing) > 0 {
-		fs.Usage()
-		return fmt.Errorf("missing required flags: %v", missing)
+		log.Printf("feeds serve: no feed configured (missing %v) — idling. Set the missing flags to start the rewrite pipeline. Send SIGTERM or Ctrl+C to stop.", missing)
+		<-ctx.Done()
+		log.Printf("feeds serve: shutdown signal received")
+		return nil
 	}
 
 	// Ensure the data dir exists (state file lives here by default).
@@ -117,9 +134,6 @@ Flags:
 		Output:   out,
 		Cache:    ch,
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	// Run once immediately, then on the ticker.
 	if err := pipeline.Run(cfg); err != nil {

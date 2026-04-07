@@ -17,25 +17,36 @@
 FROM golang:1.25-alpine AS go-builder
 
 ARG TARGETARCH
+# VERSION is stamped into the binary via -ldflags. The Makefile derives it
+# from RELEASE_VERSION (release branch name → git tag), so `feeds --version`
+# always mirrors the canonical git version. Defaults to 'dev' for bare
+# `docker build .` invocations outside of make.
+ARG VERSION=dev
 
 WORKDIR /src
 
-# Copy module files first (cacheable layer). go.sum is generated on first
-# build via `go mod download` if missing — the [m] glob allows it to be absent.
-COPY go.mod go.su[m] ./
-RUN go mod download
-
-# Copy the rest of the source
+# Copy the full source tree, then run `go mod tidy` to resolve the import
+# graph and write go.sum from scratch. We're not committing go.sum to the
+# repo (v0.1.0 bootstrap), so the build needs to self-bootstrap each time.
+# `go mod tidy` is the right tool here: `go mod download` alone won't add
+# missing go.sum entries on a cold start. With one direct dependency
+# (beevik/etree), the per-build network cost is ~1 second, not worth
+# optimizing. After v0.1.0 ships, committing go.sum and switching to the
+# standard "COPY go.mod go.sum + download as a cache layer" pattern is a
+# trivial follow-up.
 COPY . .
+RUN go mod tidy
 
 # Run the 5 critical tests gating v0.1.0. If any fail, the build fails loud
 # and nothing ships. `go vet` is cheap and catches a lot of silly mistakes
 # so it runs too.
 RUN go vet ./... && go test ./...
 
-# Build the feeds binary (statically linked, no CGO)
+# Build the feeds binary (statically linked, no CGO). VERSION comes from the
+# Makefile's RELEASE_VERSION cascade (release branch name → git tag) or
+# defaults to 'dev' for bare `docker build .` invocations outside of make.
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
-    go build -trimpath -ldflags="-s -w -X main.version=v0.1.0" -o /feeds ./cmd/feeds
+    go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /feeds ./cmd/feeds
 
 # =============================================================================
 # Stage 2: RUNTIME — minimal Alpine with just the binary
