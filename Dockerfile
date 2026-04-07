@@ -9,8 +9,8 @@
 # PocketBase provides: HTTP server, static file serving (pb_public/),
 # admin UI at /_/, cron scheduler, SQLite, and graceful shutdown.
 #
-# The Go pipeline code in internal/ is kept as a reference implementation
-# and high-performance fallback for large-scale multi-feed deployments.
+# For high-scale deployments needing a compiled pipeline, the rewrite
+# logic in pb_hooks/lib/pipeline.js can be reimplemented as a PB Go plugin.
 # =============================================================================
 
 FROM alpine:3.21

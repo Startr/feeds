@@ -40,3 +40,6 @@ go.work.sum
 
 # Runtime state for the rewriter
 .feeds-state.json
+
+# Generated feed XML (runtime output, not source)
+pb_public/v1/*.xml

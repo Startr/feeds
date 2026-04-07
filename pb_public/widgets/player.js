@@ -65,13 +65,42 @@
     '.footer { display: flex; align-items: center; gap: 8px; padding: 8px 16px 12px; border-top: 1px solid #e5e7eb; }',
     '.picker { flex: 1; min-width: 0; font-size: 13px; padding: 6px 8px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; color: #1a1a1a; font-family: inherit; cursor: pointer; }',
     '.picker:focus { outline: 2px solid var(--startr-accent, #2563eb); outline-offset: -1px; }',
+    '.btn-speed { font-size: 12px; padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; color: #1a1a1a; cursor: pointer; font-family: inherit; font-weight: 600; min-width: 44px; text-align: center; }',
+    '.btn-speed:hover { background: #f3f4f6; }',
     '.btn-share { font-size: 12px; display: flex; align-items: center; gap: 4px; padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; color: #1a1a1a; cursor: pointer; font-family: inherit; }',
     '.btn-share:hover { background: #f3f4f6; }',
     '.tooltip { font-size: 11px; color: var(--startr-accent, #2563eb); font-weight: 600; }',
     '',
-    '/* Loading + error states */',
-    '.loading, .error { padding: 24px 16px; text-align: center; font-size: 14px; color: #666; }',
-    '.error { color: #dc2626; }'
+    '/* Loading skeleton */',
+    '@keyframes shimmer { 0% { background-position: -200px 0; } 100% { background-position: 200px 0; } }',
+    '.skel { background: #e5e7eb; background-image: linear-gradient(90deg, #e5e7eb 0px, #f3f4f6 40px, #e5e7eb 80px); background-size: 200px 100%; animation: shimmer 1.4s infinite linear; border-radius: 4px; }',
+    '.skel-art { width: 80px; height: 80px; border-radius: 8px; flex-shrink: 0; }',
+    '.skel-line { height: 14px; margin-bottom: 8px; }',
+    '.skel-circle { width: 32px; height: 32px; border-radius: 50%; }',
+    '.skel-circle-lg { width: 44px; height: 44px; }',
+    '.skel-bar { height: 4px; border-radius: 2px; width: 100%; }',
+    '.loading { padding: 24px 16px; text-align: center; font-size: 14px; color: #666; }',
+    '',
+    '/* Dark mode */',
+    '@media (prefers-color-scheme: dark) {',
+    '  .card { background: hsl(210, 30%, 8%); border-color: #333; }',
+    '  .show-title { color: #999; }',
+    '  .ep-title { color: hsl(0, 0%, 92%); }',
+    '  .ep-date { color: #777; }',
+    '  .btn { color: hsl(0, 0%, 92%); }',
+    '  .btn:hover { background: #1f2937; }',
+    '  .time { color: #999; }',
+    '  .scrubber { background: #333; }',
+    '  .footer { border-top-color: #333; }',
+    '  .picker { background: hsl(210, 30%, 8%); color: hsl(0, 0%, 92%); border-color: #333; }',
+    '  .btn-speed { background: hsl(210, 30%, 8%); color: hsl(0, 0%, 92%); border-color: #333; }',
+    '  .btn-speed:hover { background: #1f2937; }',
+    '  .btn-share { background: hsl(210, 30%, 8%); color: hsl(0, 0%, 92%); border-color: #333; }',
+    '  .btn-share:hover { background: #1f2937; }',
+    '  .loading { color: #999; }',
+    '  .artwork { background: #222; }',
+    '  .skel { background: #333; background-image: linear-gradient(90deg, #333 0px, #444 40px, #333 80px); }',
+    '}'
   ].join('\n');
 
   // --- Component ---
@@ -87,6 +116,8 @@
       this._showImage = '';
       this._currentIndex = 0;
       this._progressTimer = 0;
+      this._scrubbing = false;
+      this._playbackRate = 1;
       this._boundKeyHandler = this._handleKeyboard.bind(this);
     }
 
@@ -123,7 +154,21 @@
       }
       this._feedUrl = feedUrl;
 
-      this._shadow.innerHTML = '<style>' + STYLE + '</style><div class="card"><div class="loading">Loading feed\u2026</div></div>';
+      this._shadow.innerHTML = '<style>' + STYLE + '</style>' +
+        '<div class="card">' +
+        '<div class="header">' +
+        '<div class="skel skel-art"></div>' +
+        '<div class="meta">' +
+        '<div class="skel skel-line" style="width:40%"></div>' +
+        '<div class="skel skel-line" style="width:75%"></div>' +
+        '</div></div>' +
+        '<div class="controls">' +
+        '<div class="skel skel-circle"></div>' +
+        '<div class="skel skel-circle skel-circle-lg"></div>' +
+        '<div class="skel skel-circle"></div>' +
+        '</div>' +
+        '<div class="scrubber-wrap"><div class="skel skel-bar"></div></div>' +
+        '</div>';
 
       var self = this;
       fetch(feedUrl)
@@ -139,7 +184,7 @@
           self._loadEpisode(self._currentIndex);
         })
         .catch(function(err) {
-          self._shadow.innerHTML = '<style>' + STYLE + '</style><div class="card"><div class="error">Could not load feed: ' + _esc(err.message) + '</div></div>';
+          self._shadow.innerHTML = '<style>' + STYLE + '</style><div class="card"><div class="loading">Couldn\u2019t load feed</div></div>';
         });
     }
 
@@ -208,6 +253,7 @@
         html += '<option value="' + i + '"' + sel + '>' + _esc(e.title) + '</option>';
       }
       html += '</select>';
+      html += '<button class="btn-speed" data-action="speed">' + this._playbackRate + 'x</button>';
       html += '<button class="btn-share" data-action="share">' + icon('share', 14) + ' Share</button>';
       html += '</div>';
 
@@ -255,6 +301,7 @@
         if (action === 'play')  self._togglePlay();
         if (action === 'back')  self._seek(-15);
         if (action === 'fwd')   self._seek(15);
+        if (action === 'speed') self._cycleSpeed();
         if (action === 'share') self._share();
       });
 
@@ -266,35 +313,16 @@
 
       // Scrubber
       var scrubber = this._shadow.querySelector('.scrubber');
-      var scrubbing = false;
       scrubber.addEventListener('input', function() {
-        scrubbing = true;
+        self._scrubbing = true;
         if (self._audio && self._audio.duration) {
           self._audio.currentTime = (scrubber.value / 100) * self._audio.duration;
         }
       });
-      scrubber.addEventListener('change', function() { scrubbing = false; });
+      scrubber.addEventListener('change', function() { self._scrubbing = false; });
 
-      // Audio events
-      if (this._audio) {
-        this._audio.addEventListener('timeupdate', function() {
-          if (scrubbing) return;
-          self._updateTime();
-          // Throttled progress save (every 5s)
-          var now = Date.now();
-          if (now - self._progressTimer > 5000) {
-            self._progressTimer = now;
-            self._saveProgress();
-          }
-        });
-        this._audio.addEventListener('pause', function() { self._saveProgress(); self._updatePlayBtn(); });
-        this._audio.addEventListener('play', function() { self._updatePlayBtn(); });
-        this._audio.addEventListener('ended', function() {
-          self._clearProgress();
-          self._updatePlayBtn();
-        });
-        this._audio.addEventListener('loadedmetadata', function() { self._updateTime(); });
-      }
+      // Audio events are bound once in _bindAudioEvents(), not here.
+      // This prevents listener accumulation on episode switch.
 
       // Keyboard (focus-scoped)
       card.addEventListener('keydown', this._boundKeyHandler);
@@ -306,7 +334,8 @@
       var ep = this._episodes[index];
       if (!ep || !ep.audio) return;
 
-      if (!this._audio) {
+      var firstLoad = !this._audio;
+      if (firstLoad) {
         this._audio = new Audio();
         this._audio.preload = 'metadata';
       } else {
@@ -316,9 +345,29 @@
       this._audio.src = ep.audio;
       this._currentIndex = index;
 
-      // Re-bind audio events (new episode)
       this._render();
+      if (firstLoad) this._bindAudioEvents();
       this._restoreProgress();
+    }
+
+    _bindAudioEvents() {
+      var self = this;
+      this._audio.addEventListener('timeupdate', function() {
+        if (self._scrubbing) return;
+        self._updateTime();
+        var now = Date.now();
+        if (now - self._progressTimer > 5000) {
+          self._progressTimer = now;
+          self._saveProgress();
+        }
+      });
+      this._audio.addEventListener('pause', function() { self._saveProgress(); self._updatePlayBtn(); });
+      this._audio.addEventListener('play', function() { self._updatePlayBtn(); });
+      this._audio.addEventListener('ended', function() {
+        self._clearProgress();
+        self._updatePlayBtn();
+      });
+      this._audio.addEventListener('loadedmetadata', function() { self._updateTime(); });
     }
 
     _togglePlay() {
@@ -333,6 +382,15 @@
     _seek(seconds) {
       if (!this._audio) return;
       this._audio.currentTime = Math.max(0, Math.min(this._audio.duration || 0, this._audio.currentTime + seconds));
+    }
+
+    _cycleSpeed() {
+      var speeds = [1, 1.25, 1.5, 2];
+      var idx = speeds.indexOf(this._playbackRate);
+      this._playbackRate = speeds[(idx + 1) % speeds.length];
+      if (this._audio) this._audio.playbackRate = this._playbackRate;
+      var btn = this._shadow.querySelector('.btn-speed');
+      if (btn) btn.textContent = this._playbackRate + 'x';
     }
 
     _selectEpisode(index) {

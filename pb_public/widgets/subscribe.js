@@ -49,7 +49,12 @@
     '  border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 600;',
     '  color: #fff; background: var(--startr-accent, #2563eb); transition: opacity 0.15s; }',
     'a:hover { opacity: 0.85; }',
-    'a svg { flex-shrink: 0; }'
+    'a svg { flex-shrink: 0; }',
+    '',
+    '/* Dark mode */',
+    '@media (prefers-color-scheme: dark) {',
+    '  a { background: var(--startr-accent, #60a5fa); }',
+    '}'
   ].join('\n');
 
   class StartrSubscribe extends HTMLElement {

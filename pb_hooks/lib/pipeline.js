@@ -125,12 +125,16 @@ function rewriteFeed(feed) {
   if (feed.selfUrl) {
     var atomLink = null;
     if (channel.elements) {
-      atomLink = channel.elements.find(function(el) {
-        return el.type === "element" &&
-               el.name === "atom:link" &&
-               el.attributes &&
-               el.attributes.rel === "self";
-      });
+      for (var ai = 0; ai < channel.elements.length; ai++) {
+        var el = channel.elements[ai];
+        if (el.type === "element" &&
+            el.name === "atom:link" &&
+            el.attributes &&
+            el.attributes.rel === "self") {
+          atomLink = el;
+          break;
+        }
+      }
     }
     if (atomLink) {
       atomLink.attributes.href = feed.selfUrl;

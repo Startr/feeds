@@ -57,7 +57,9 @@ routerAdd("GET", "/api/feeds/public", function(e) {
     for (var i = 0; i < records.length; i++) {
       feeds.push({ slug: records[i].getString("slug"), title: records[i].getString("title") });
     }
-  } catch(err) {}
+  } catch(err) {
+    console.log("[feeds] collection query failed: " + err);
+  }
   if (feeds.length === 0) {
     var slug = $os.getenv("FEEDS_SLUG");
     if (slug) feeds.push({ slug: slug, title: $os.getenv("FEEDS_TITLE") || slug });
@@ -66,9 +68,12 @@ routerAdd("GET", "/api/feeds/public", function(e) {
 });
 
 // ---------------------------------------------------------------------------
-// Debug route — trigger pipeline manually (remove before release)
+// Debug route — trigger pipeline manually (superuser auth required)
 // ---------------------------------------------------------------------------
 routerAdd("GET", "/debug/run", function(e) {
+  if (!e.hasSuperuserAuth()) {
+    return e.json(401, { message: "superuser auth required" });
+  }
   try {
     var pipeline = require(__hooks + "/lib/pipeline.js");
     pipeline.runAllFeeds();
@@ -83,8 +88,12 @@ routerAdd("GET", "/debug/run", function(e) {
 // ---------------------------------------------------------------------------
 var cronExpr = $os.getenv("FEEDS_CRON") || "*/15 * * * *";
 cronAdd("feeds_rewrite", cronExpr, function() {
-  var pipeline = require(__hooks + "/lib/pipeline.js");
-  pipeline.runAllFeeds();
+  try {
+    var pipeline = require(__hooks + "/lib/pipeline.js");
+    pipeline.runAllFeeds();
+  } catch(err) {
+    console.log("[feeds] cron rewrite failed: " + err);
+  }
 });
 
 // ---------------------------------------------------------------------------

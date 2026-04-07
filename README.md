@@ -25,7 +25,7 @@ Startr/feeds is the feed proxy / rewriter we wished existed:
 - `<channel><generator>` rewritten to identify Startr/feeds + version (replaces upstream "Anchor Podcasts" / "Spotify for Podcasters")
 - HTTP conditional GET with `If-None-Match` / `If-Modified-Since` (98% of scheduled runs short-circuit on HTTP 304)
 - Fail-loud per feed on upstream errors — last-good output is preserved, other feeds continue
-- **Go pipeline** (`internal/`) kept as reference implementation and high-performance fallback for large-scale multi-feed deployments
+- For high-scale deployments needing a compiled pipeline, the rewrite logic in `pb_hooks/lib/pipeline.js` can be reimplemented in Go as a PocketBase plugin
 
 v0.3+ adds Atom, JSON Feed, YouTube, text/video `media_type` support — at which point the tool is a self-hostable FeedBurner replacement.
 
