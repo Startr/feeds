@@ -1,6 +1,6 @@
 # Startr/feeds
 
-## v0.0.3
+## v0.0.4
 
 Self-hosted feed rewriter. Fetch an RSS/Atom feed from upstream, rewrite the branding and channel metadata to point at your own URL, republish through your own infrastructure. Your subscribers bind to your URL, forever.
 
