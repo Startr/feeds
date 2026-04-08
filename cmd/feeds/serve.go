@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -65,6 +66,13 @@ Flags:
 	}
 
 	if err := fs.Parse(args); err != nil {
+		// `feeds serve --help` triggers fs.Usage() (which already printed)
+		// and returns flag.ErrHelp. Treat that as success — the user got
+		// what they asked for, exit 0 instead of dumping the error to
+		// stderr and exiting 1.
+		if errors.Is(err, flag.ErrHelp) {
+			return nil
+		}
 		return err
 	}
 

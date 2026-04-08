@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -50,6 +51,13 @@ Flags:
 	}
 
 	if err := fs.Parse(args); err != nil {
+		// `feeds rewrite --help` triggers fs.Usage() (which already
+		// printed) and returns flag.ErrHelp. Treat that as success — the
+		// user got what they asked for, exit 0 instead of dumping the
+		// error to stderr and exiting 1.
+		if errors.Is(err, flag.ErrHelp) {
+			return nil
+		}
 		return err
 	}
 

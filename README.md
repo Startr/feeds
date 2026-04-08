@@ -16,11 +16,13 @@ Startr/feeds is the feed proxy / rewriter we wished existed:
 - **Rent the audio host.** `<enclosure url>` elements are left untouched. Spotify or Anchor host the audio bytes for free. If you want to move to Archive.org, S3, or your own static host later, swap it with a config change and nobody notices.
 - **No lock-in, anywhere.** AGPL-3.0. Single binary. Self-hostable on anything that runs a Go binary, including a Raspberry Pi. If you want to run this from cron on a box in your closet, nothing stops you.
 
-## Scope for v0.1.0
+## Current scope (v0.0.x)
 
+- Two subcommands: `feeds rewrite` (single-shot for cron/CI) and `feeds serve` (long-running ticker for always-on hosts; fail-soft when no upstream is configured so empty starts don't crash deploys)
 - One source adapter: `SpotifySource` (parses Spotify for Podcasters' auto-generated RSS)
 - One output renderer: `RSS2PodcastRenderer` (writes RSS 2.0 + iTunes namespace XML)
 - DOM-style rewriter via [`beevik/etree`](https://github.com/beevik/etree) — preserves iTunes namespace, podcast 2.0 namespace, and any unknown Spotify tags on round-trip
+- `<channel><generator>` rewritten to identify Startr/feeds + version (replaces upstream "Anchor Podcasts" / "Spotify for Podcasters")
 - HTTP conditional GET with `If-None-Match` / `If-Modified-Since` (98% of scheduled runs short-circuit on HTTP 304)
 - Atomic write-rename output (readers never see a partial file)
 - Fail-loud on upstream errors — last-good output is preserved
@@ -29,37 +31,41 @@ v0.2 wraps this in [PocketBase](https://pocketbase.io) for multi-feed orchestrat
 
 ## Install
 
-### Binary from GitHub Releases
+### Container image (recommended)
 
-```bash
-# Replace with your platform (linux_amd64, darwin_arm64, windows_amd64, etc.)
-curl -L https://github.com/Startr/feeds/releases/latest/download/feeds_linux_amd64.tar.gz | tar -xz
-./feeds --help
-```
-
-Every release is signed with [Sigstore cosign](https://www.sigstore.dev/) (keyless) and ships a SLSA Level 3 provenance attestation. Verify before running:
-
-```bash
-cosign verify-blob \
-  --certificate feeds_linux_amd64.tar.gz.cert \
-  --signature feeds_linux_amd64.tar.gz.sig \
-  feeds_linux_amd64.tar.gz
-```
-
-### Container image
+Multi-arch (amd64 + arm64) is published to GHCR on every tag.
 
 ```bash
 docker run --rm \
-  -v $(pwd)/feeds.yaml:/config.yaml \
-  -v $(pwd)/public:/output \
-  ghcr.io/Startr/feeds:latest rewrite --config /config.yaml
+  -v $(pwd)/public:/out \
+  ghcr.io/Startr/feeds:latest \
+  feeds rewrite \
+    --upstream      https://anchor.fm/s/YOUR_SHOW_ID/podcast/rss \
+    --output        /out/your-show.xml \
+    --self-url      https://feed.yourdomain.com/v1/your-show.xml \
+    --channel-title "Your Show" \
+    --channel-link  https://yourdomain.com/podcast
 ```
 
-### Build from source
+Pin to a specific release with `ghcr.io/Startr/feeds:0.0.4` (or any tag from the [Releases](https://github.com/Startr/feeds/releases) page).
+
+### From source with `go install`
 
 ```bash
 go install github.com/Startr/feeds/cmd/feeds@latest
+feeds --help
 ```
+
+### From source with `make`
+
+```bash
+git clone https://github.com/Startr/feeds && cd feeds
+make it_build       # produces startr/feeds:latest locally
+```
+
+### Binary tarballs (planned, v0.1.0+)
+
+Pre-built binary tarballs from GitHub Releases, signed with [Sigstore cosign](https://www.sigstore.dev/) and a SLSA Level 3 provenance attestation, are planned for v0.1.0. v0.0.x ships only the GHCR container and `go install` paths.
 
 ## Quick start
 
@@ -122,6 +128,7 @@ CLI flags will always override YAML when both are set.
 | `<channel><title>` | Rewritten to your show title |
 | `<channel><link>` | Rewritten to your show page |
 | `<channel><image>` | Rewritten to your hosted cover art |
+| `<channel><generator>` | Rewritten to identify Startr/feeds + version (replaces upstream "Anchor Podcasts" / "Spotify for Podcasters") |
 | `<atom:link rel="self">` | Rewritten to your self URL (injected if missing — required by Apple Podcasts) |
 | `<itunes:author>`, `<itunes:owner>`, `<itunes:image>` | Rewritten to your branding |
 | `<item><enclosure url>` | **Left alone.** Points at the upstream audio host. This is intentional. |
@@ -152,7 +159,7 @@ You also need a container runtime. The Makefile auto-detects `podman` (preferred
 ### Local development
 
 ```bash
-make it_build              # 3-stage Docker build → startr/feeds:latest
+make it_build              # 2-stage Go build → startr/feeds:latest (runs go vet + tests)
 make it_run                # run on localhost:8090, data in volume startr-media-data
 make it_run_dev            # run with bind-mounted pb_hooks/, pb_migrations/, pb_public/
 make it_build_n_run        # build + run in one shot
@@ -162,7 +169,8 @@ make it_build_n_run        # build + run in one shot
 
 The Makefile uses `git-flow-next` for branch management. Release version is auto-computed from the latest git tag.
 
-**First release ever** (no tags exist yet):
+<details>
+<summary><b>First release ever</b> — no tags exist yet (kept for forks bootstrapping fresh)</summary>
 
 ```bash
 git checkout develop
@@ -173,6 +181,8 @@ make it_build && make it_run       # smoke test
 make ghcr_login                    # authenticate Docker against ghcr.io via gh CLI
 make release_and_push_GHCR         # finish release + multi-arch GHCR push
 ```
+
+</details>
 
 **Subsequent releases** (pick the bump type):
 
@@ -225,5 +235,7 @@ No CLA. Contributions accepted under the [Developer Certificate of Origin](./DCO
 The names `Startr/feeds`, `Startr`, and `startrcast` are project marks reserved separately from the code license. See [TRADEMARK.md](./TRADEMARK.md). Forks that make substantive changes should use a different name.
 
 ## Docs
+
+Per-release notes live in [CHANGELOG.md](./CHANGELOG.md).
 
 Design thinking and editorial context for the canonical `startr.media` instance live in [`docs/`](./docs/). These documents explain why the tool exists, what problem it solves, and how it fits into the broader Sage ecosystem. They are useful context for anyone evaluating whether to adopt Startr/feeds.
